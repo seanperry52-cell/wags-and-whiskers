@@ -24,6 +24,28 @@ const revealObserver = new IntersectionObserver((entries) => {
 
 revealEls.forEach(el => revealObserver.observe(el));
 
+// Jumping straight to a section via an anchor link (e.g. the "Book Now" nav
+// button) can land on a tall .reveal section before the IntersectionObserver
+// fires, leaving it stuck at opacity:0. Reveal the target immediately instead.
+function revealTarget(hash) {
+  const target = document.querySelector(hash);
+  if (!target) return;
+  target.querySelectorAll('.reveal').forEach(el => {
+    el.classList.add('in-view');
+    revealObserver.unobserve(el);
+  });
+  if (target.classList.contains('reveal')) {
+    target.classList.add('in-view');
+    revealObserver.unobserve(target);
+  }
+}
+
+document.querySelectorAll('a[href^="#"]').forEach(link => {
+  link.addEventListener('click', () => revealTarget(link.getAttribute('href')));
+});
+
+if (window.location.hash) revealTarget(window.location.hash);
+
 // ── Parallax floating paws ─────────────────────────────────────────────────
 const paws = document.querySelectorAll('.paw');
 
