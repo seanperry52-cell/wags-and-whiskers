@@ -126,6 +126,70 @@ document.getElementById('calNext').addEventListener('click', () => {
 });
 renderCalendar();
 
+// ── Drop-in / walk time slots ───────────────────────────────────────────
+// Drop-in visits and walks are the same for scheduling purposes — each
+// books a single 30-minute slot, picked from the same availability data.
+const DROP_IN_SERVICES = new Set(['Drop-In Visit', 'Dog Walking']);
+
+const serviceTypeSelect = document.getElementById('serviceType');
+const startDateInput = document.getElementById('startDate');
+const startTimeInput = document.getElementById('startTime');
+const dropinSlots = document.getElementById('dropinSlots');
+
+async function renderTimeSlots() {
+  const isDropIn = DROP_IN_SERVICES.has(serviceTypeSelect.value);
+  const date = startDateInput.value;
+
+  if (!isDropIn) {
+    startTimeInput.style.display = '';
+    dropinSlots.hidden = true;
+    dropinSlots.innerHTML = '';
+    return;
+  }
+
+  startTimeInput.style.display = 'none';
+  dropinSlots.hidden = false;
+
+  if (!date) {
+    dropinSlots.innerHTML = '<p class="slots-loading">Pick a date above to see open times.</p>';
+    return;
+  }
+
+  dropinSlots.innerHTML = '<p class="slots-loading">Loading times…</p>';
+  try {
+    const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${date}`);
+    if (!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    dropinSlots.innerHTML = '';
+    (data.slots || []).forEach(s => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `slot-btn ${s.available ? 'slot-available' : 'slot-booked'}`;
+      btn.textContent = formatTime(s.time);
+      btn.disabled = !s.available;
+      if (s.time === startTimeInput.value) btn.classList.add('slot-selected');
+      btn.addEventListener('click', () => {
+        startTimeInput.value = s.time;
+        dropinSlots.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('slot-selected'));
+        btn.classList.add('slot-selected');
+      });
+      dropinSlots.appendChild(btn);
+    });
+  } catch (err) {
+    dropinSlots.innerHTML = '<p class="slots-error">Could not load times — please try again.</p>';
+  }
+}
+
+serviceTypeSelect.addEventListener('change', () => {
+  startTimeInput.value = '';
+  renderTimeSlots();
+});
+startDateInput.addEventListener('change', () => {
+  startTimeInput.value = '';
+  renderTimeSlots();
+});
+renderTimeSlots();
+
 // ── Booking form -> email + pre-filled printable contract ──────────────────
 const bookingForm = document.getElementById('bookingForm');
 
@@ -283,6 +347,11 @@ bookingForm.addEventListener('submit', async (e) => {
   const data = new FormData(bookingForm);
   const d = Object.fromEntries(data.entries());
 
+  if (DROP_IN_SERVICES.has(d.serviceType) && !d.startTime) {
+    showBookingStatus('Please choose a time slot for your visit or walk.', 'error');
+    return;
+  }
+
   // Reserve the request with the booking system first — for overnight/day
   // care this checks the dates are still available before we proceed.
   try {
@@ -297,6 +366,7 @@ bookingForm.addEventListener('submit', async (e) => {
       return;
     }
     renderCalendar();
+    renderTimeSlots();
   } catch (err) {
     // booking server unreachable — fall back to email-only flow
   }

@@ -224,7 +224,7 @@
           <span><i class="dot dot-booked"></i> Booked (overnight/day care)</span>
           <span><i class="dot dot-unavailable"></i> Unavailable</span>
         </div>
-        <p class="calendar-note">Drop-in visits and walks aren't shown here — those don't take a full day.</p>
+        <p class="calendar-note">Drop-in visits and walks don't take a full day — pick your date and service below to see open time slots.</p>
       </div>
 
       <form id="bookingForm" class="booking-form reveal">
@@ -268,9 +268,10 @@
         </div>
 
         <div class="form-row">
-          <div class="form-group">
+          <div class="form-group full" id="timeGroup">
             <label for="startTime">Preferred Time</label>
             <input type="time" id="startTime" name="startTime" />
+            <div id="dropinSlots" class="dropin-slots" hidden></div>
           </div>
         </div>
 

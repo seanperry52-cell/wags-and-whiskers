@@ -586,6 +586,43 @@ a { color: inherit; text-decoration: none; }
   margin-top: 0.6rem;
 }
 
+/* ── DROP-IN / WALK TIME SLOTS ── */
+.dropin-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.slot-btn {
+  padding: 0.55rem 0.4rem;
+  border-radius: 10px;
+  border: 2px solid var(--cream-soft);
+  background: var(--cream-soft);
+  color: var(--brown);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.slot-available:hover { border-color: var(--rust); }
+
+.slot-selected { background: var(--rust); border-color: var(--rust); color: #fff; }
+
+.slot-booked {
+  background: #e8e4dc;
+  color: #aaa;
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
+.slots-loading, .slots-error {
+  font-size: 0.85rem;
+  color: var(--brown-light);
+  grid-column: 1 / -1;
+}
+
 .booking-status {
   text-align: center;
   font-weight: 700;
