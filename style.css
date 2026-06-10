@@ -387,6 +387,49 @@ a { color: inherit; text-decoration: none; }
 .service-area h3 { color: var(--cream); margin-bottom: 0.5rem; }
 .service-area p { font-size: 1.15rem; font-weight: 600; }
 
+/* ── RATES ── */
+.rates-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.rate-card {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 2rem 1.8rem;
+  box-shadow: var(--shadow);
+}
+
+.rate-card h3 {
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+  color: var(--rust);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.rate-card-sub {
+  font-family: 'Quicksand', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--brown-light);
+  letter-spacing: 0.3px;
+}
+
+.rate-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px dashed rgba(74,55,40,0.12);
+  font-size: 0.95rem;
+}
+
+.rate-row:last-child { border-bottom: none; }
+
+.rate-row span:first-child { color: var(--brown-light); }
+.rate-row span:last-child { font-weight: 700; white-space: nowrap; }
+
 /* ── REVIEWS ── */
 .reviews { background: var(--cream-soft); }
 
