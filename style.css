@@ -654,6 +654,10 @@ a { color: inherit; text-decoration: none; }
 
 .form-group.full { grid-column: 1 / -1; }
 
+/* .form-group sets display:flex at the same specificity as the UA [hidden]
+   rule, which would otherwise win and keep hidden groups visible. */
+.form-group[hidden] { display: none; }
+
 label {
   font-weight: 700;
   font-size: 0.9rem;
