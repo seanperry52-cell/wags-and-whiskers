@@ -140,6 +140,33 @@ const endTimeInput = document.getElementById('endTime');
 const dropinSlotsGroup = document.getElementById('dropinSlotsGroup');
 const dropinSlots = document.getElementById('dropinSlots');
 
+// Drop-off / pick-up time pickers offer the same 7:00 AM – 9:00 PM,
+// 30-minute slot options as the drop-in time picker.
+function populateTimeOptions(select) {
+  select.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  placeholder.textContent = 'Select a time';
+  select.appendChild(placeholder);
+  for (let mins = 7 * 60; mins <= 21 * 60; mins += 30) {
+    const h = String(Math.floor(mins / 60)).padStart(2, '0');
+    const m = String(mins % 60).padStart(2, '0');
+    const time = `${h}:${m}`;
+    const opt = document.createElement('option');
+    opt.value = time;
+    opt.textContent = formatTime(time);
+    select.appendChild(opt);
+  }
+}
+populateTimeOptions(startTimeInput);
+populateTimeOptions(endTimeInput);
+
+// A drop-in visit can cover several check-ins on the same day, so the
+// slot picker allows selecting more than one time slot.
+let selectedSlots = new Set();
+
 async function renderTimeSlots() {
   const date = startDateInput.value;
 
@@ -160,11 +187,15 @@ async function renderTimeSlots() {
       btn.className = `slot-btn ${s.available ? 'slot-available' : 'slot-booked'}`;
       btn.textContent = formatTime(s.time);
       btn.disabled = !s.available;
-      if (s.time === startTimeInput.value) btn.classList.add('slot-selected');
+      if (selectedSlots.has(s.time)) btn.classList.add('slot-selected');
       btn.addEventListener('click', () => {
-        startTimeInput.value = s.time;
-        dropinSlots.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('slot-selected'));
-        btn.classList.add('slot-selected');
+        if (selectedSlots.has(s.time)) {
+          selectedSlots.delete(s.time);
+          btn.classList.remove('slot-selected');
+        } else {
+          selectedSlots.add(s.time);
+          btn.classList.add('slot-selected');
+        }
       });
       dropinSlots.appendChild(btn);
     });
@@ -189,6 +220,7 @@ function updateTimeFields() {
     endTimeGroup.hidden = true;
     endTimeInput.value = '';
     dropinSlotsGroup.hidden = false;
+    selectedSlots.clear();
     renderTimeSlots();
   } else {
     startTimeGroup.hidden = false;
@@ -206,7 +238,10 @@ serviceTypeSelect.addEventListener('change', () => {
 });
 startDateInput.addEventListener('change', () => {
   startTimeInput.value = '';
-  if (DROP_IN_SERVICES.has(serviceTypeSelect.value)) renderTimeSlots();
+  if (DROP_IN_SERVICES.has(serviceTypeSelect.value)) {
+    selectedSlots.clear();
+    renderTimeSlots();
+  }
 });
 updateTimeFields();
 
@@ -231,6 +266,11 @@ function formatTime(value) {
   return new Date(2000, 0, 1, h, m).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
+function formatTimesList(value) {
+  if (!value) return '____________________';
+  return value.split(',').map(t => formatTime(t.trim())).join(', ');
+}
+
 function nightsBetween(start, end) {
   if (!start || !end) return 1;
   const diff = Math.round((new Date(end) - new Date(start)) / 86400000);
@@ -241,10 +281,135 @@ function checkbox(checked) {
   return checked ? '☑' : '☐';
 }
 
+const LOGO_URL = 'https://seanperry52-cell.github.io/wags-and-whiskers/assets/logo.png';
+
+const PACKET_STYLE = `
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, 'Times New Roman', serif; color: #2a2018; line-height: 1.6; margin: 0; }
+  .page { max-width: 760px; margin: 0 auto; padding: 2rem 1.5rem; }
+  .page + .page { border-top: 1px dashed #ccc; }
+  @media print {
+    .page { page-break-after: always; border-top: none; padding: 1rem 0.4rem; }
+    .page:last-child { page-break-after: auto; }
+    .print-btn { display: none; }
+  }
+  .print-btn { display: block; margin: 1rem auto; padding: 0.6rem 1.6rem; font-size: 1rem; cursor: pointer; }
+  .cover { text-align: center; padding-top: 4rem; }
+  .cover img { max-width: 320px; }
+  h1.doc-title { text-align: center; font-size: 1.6rem; margin: 0 0 0.2rem; }
+  .doc-sub { text-align: center; color: #6b5645; margin-bottom: 1.5rem; }
+  h2.section-h { color: #2a7fb0; font-size: 1.2rem; margin: 0 0 1rem; }
+  h3.sub-h { font-size: 1.05rem; margin: 1.3rem 0 0.4rem; border-bottom: 1px solid #ccc; padding-bottom: 0.2rem; }
+  .field { margin: 0.3rem 0; }
+  .field label { font-weight: bold; }
+  .checks div { margin: 0.25rem 0; }
+  .sign-block { margin-top: 2rem; }
+  .sign-line { display: inline-block; min-width: 240px; border-bottom: 1px solid #2a2018; }
+  .blank-line { display: inline-block; min-width: 200px; border-bottom: 1px solid #999; }
+  .blank-block { border-bottom: 1px solid #999; min-height: 1.4rem; margin-bottom: 0.9rem; }
+  table.rates { width: 100%; border-collapse: collapse; margin-bottom: 1.2rem; font-size: 0.92rem; }
+  table.rates caption { font-weight: bold; text-align: left; background: #f3ece1; padding: 0.4rem 0.6rem; border: 1px solid #ccc; caption-side: top; }
+  table.rates th, table.rates td { border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; }
+  table.rates td:last-child, table.rates th:last-child { text-align: right; }
+`;
+
+function ratesTables() {
+  return `
+  <table class="rates">
+    <caption>Drop-Ins at Owner's House</caption>
+    <tr><td>Drop-In 30 minutes &lt; 5 miles</td><td>$16.00</td></tr>
+    <tr><td>Drop-In 30 minutes &gt; 5 miles</td><td>$18.00</td></tr>
+    <tr><td>Drop-In 60 minutes &lt; 5 miles</td><td>$26.00</td></tr>
+    <tr><td>Drop-In 60 minutes &gt; 5 miles</td><td>$28.00</td></tr>
+    <tr><td>Additional Dog</td><td>+$8.00</td></tr>
+    <tr><td>Puppy</td><td>+$4.00 to rate above</td></tr>
+    <tr><td>Extended Rate 30 minutes (14+ visits) &lt; 5 miles</td><td>$15.00</td></tr>
+    <tr><td>Extended Rate 30 minutes (14+ visits) &gt; 5 miles</td><td>$17.00</td></tr>
+  </table>
+
+  <table class="rates">
+    <caption>Day Care at Sitter's House</caption>
+    <tr><td>One Dog per Day</td><td>$40.00</td></tr>
+    <tr><td>Additional Dog</td><td>$25.00</td></tr>
+    <tr><td>Puppy (Under 1 Year)</td><td>$45.00</td></tr>
+  </table>
+
+  <table class="rates">
+    <caption>Boarding at Sitter's House</caption>
+    <tr><td>Overnight (24 hours)</td><td>$45.00</td></tr>
+    <tr><td>Additional Dog</td><td>$30.00</td></tr>
+    <tr><td>Puppy</td><td>$50.00</td></tr>
+    <tr><td>Extended Rate (10+ nights)</td><td>$40.00</td></tr>
+    <tr><td>Over 24 Hours (Additional Flat Fee)</td><td>$20.00</td></tr>
+  </table>
+
+  <table class="rates">
+    <caption>Add-Ons</caption>
+    <tr><td>Litter Box Cleaning</td><td>No Charge</td></tr>
+    <tr><td>Medication Administration</td><td>No Charge</td></tr>
+    <tr><td>Water Plants</td><td>No Charge</td></tr>
+    <tr><td>Bring Mail/Packages In</td><td>No Charge</td></tr>
+    <tr><td>Bring Trash Bins In</td><td>No Charge</td></tr>
+  </table>
+
+  <p>We tailor each visit to your pet's needs!</p>`;
+}
+
+function dogProfilePage() {
+  return `
+  <div class="page">
+    <h2 class="section-h">Dog Profile Sheet (One Per Dog)</h2>
+    <div class="field"><label>Dog's Name:</label> <span class="blank-line"></span></div>
+    <div class="field"><label>Breed:</label> <span class="blank-line"></span></div>
+    <div class="field"><label>Age:</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Weight:</label> <span class="blank-line"></span></div>
+    <div class="field"><label>Health/Allergies:</label> <span class="blank-line"></span></div>
+    <div class="field"><label>Date of Last Vaccinations:</label> <span class="blank-line"></span></div>
+    <h3 class="sub-h">Feeding Instructions</h3>
+    <div class="blank-block"></div>
+    <h3 class="sub-h">Medications</h3>
+    <div class="blank-block"></div>
+    <h3 class="sub-h">Allergies or Health Concerns</h3>
+    <div class="blank-block"></div>
+    <h3 class="sub-h">Behavior Notes (shy, anxious, aggressive, etc.)</h3>
+    <div class="blank-block"></div>
+    <h3 class="sub-h">Favorite Toys/Activities</h3>
+    <div class="blank-block"></div>
+    <h3 class="sub-h">Additional Notes</h3>
+    <div class="blank-block"></div>
+  </div>`;
+}
+
+function catProfilePage() {
+  return `
+  <div class="page">
+    <h2 class="section-h">Cat Profile Sheet (One Per Cat)</h2>
+    <div class="field"><label>Cat's Name:</label> <span class="blank-line"></span></div>
+    <div class="field"><label>Breed:</label> <span class="blank-line"></span></div>
+    <div class="field"><label>Age:</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Weight:</label> <span class="blank-line"></span></div>
+    <div class="field"><label>Health/Allergies:</label> <span class="blank-line"></span></div>
+    <div class="field"><label>Date of Last Vaccinations:</label> <span class="blank-line"></span></div>
+    <h3 class="sub-h">Feeding Instructions</h3>
+    <div class="blank-block"></div>
+    <h3 class="sub-h">Medications</h3>
+    <div class="blank-block"></div>
+    <h3 class="sub-h">Allergies or Health Concerns</h3>
+    <div class="blank-block"></div>
+    <h3 class="sub-h">Behavior Notes (shy, anxious, aggressive, etc.)</h3>
+    <div class="blank-block"></div>
+    <h3 class="sub-h">Favorite Toys/Activities</h3>
+    <div class="blank-block"></div>
+    <h3 class="sub-h">Anything Else We Should Know</h3>
+    <div class="blank-block"></div>
+  </div>`;
+}
+
 function buildContractHtml(d) {
   const serviceType = d.serviceType;
   const isDropIn = serviceType === 'Drop-In Visit';
   const isOvernight = serviceType === 'Overnight Stay';
+
+  const dropInTimes = isDropIn ? String(d.startTime || '').split(',').map(t => t.trim()).filter(Boolean) : [];
+  const visitCount = isDropIn ? Math.max(dropInTimes.length, 1) : 1;
 
   const nights = nightsBetween(d.startDate, d.endDate);
   let rate = RATE_INFO[serviceType]?.rate ?? 0;
@@ -257,7 +422,7 @@ function buildContractHtml(d) {
     dailyTotal = `$${rate.toFixed(2)}`;
     visitTotal = `$${(rate * nights).toFixed(2)}`;
   } else if (isDropIn) {
-    visitTotal = `$${rate.toFixed(2)}`;
+    visitTotal = `$${(rate * visitCount).toFixed(2)}`;
   }
 
   const dateRange = d.endDate && d.endDate !== d.startDate
@@ -266,89 +431,165 @@ function buildContractHtml(d) {
 
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
+  const serviceTypeChecks = `${checkbox(isDropIn)} Drop-in &nbsp;&nbsp; ${checkbox(isOvernight)} Overnight &nbsp;&nbsp; ${checkbox(false)} Daycare &nbsp;&nbsp; ${checkbox(false)} Other: <span class="blank-line"></span>`;
+
+  const dropOffPickup = isOvernight
+    ? `<div class="field"><label>Drop-off Time:</label> ${formatTime(d.startTime)} &nbsp;&nbsp; <label>Pick-up Time:</label> ${formatTime(d.endTime)}</div>`
+    : `<div class="field"><label>Drop-off Time:</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Pick-up Time:</label> <span class="blank-line"></span></div>`;
+
+  const dropInTimeRow = isDropIn
+    ? `<div class="field"><label>Drop-in Time(s):</label> ${formatTimesList(d.startTime)} &nbsp;&nbsp; <label>Length of Drop-in:</label> 30 minutes each</div>`
+    : `<div class="field"><label>Drop-in Time(s):</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Length of Drop-in:</label> <span class="blank-line"></span></div>`;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Pet Sitting Contract — ${d.ownerName}</title>
-<style>
-  body { font-family: Georgia, 'Times New Roman', serif; color: #2a2018; max-width: 760px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.6; }
-  h1 { text-align: center; font-size: 1.6rem; margin-bottom: 0.2rem; }
-  h2 { font-size: 1.05rem; margin: 1.4rem 0 0.4rem; border-bottom: 1px solid #ccc; padding-bottom: 0.2rem; }
-  .sub { text-align: center; color: #6b5645; margin-bottom: 1.5rem; }
-  .field { margin: 0.3rem 0; }
-  .field label { font-weight: bold; }
-  .checks div { margin: 0.25rem 0; }
-  .sign-block { margin-top: 2.5rem; }
-  .sign-line { display: inline-block; min-width: 280px; border-bottom: 1px solid #2a2018; }
-  .print-btn { display: block; margin: 0 auto 1.5rem; padding: 0.6rem 1.6rem; font-size: 1rem; cursor: pointer; }
-  @media print { .print-btn { display: none; } }
-</style>
+<title>Service Packet — ${d.ownerName}</title>
+<style>${PACKET_STYLE}</style>
 </head>
 <body>
   <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
 
-  <h1>Pet Sitting Contract</h1>
-  <p class="sub">Wags and Whiskers by Misti, LLC &mdash; "Let us spoil your pets"</p>
-
-  <p>This agreement is entered into on <strong>${today}</strong>, by and between:</p>
-
-  <h2>Pet Owner</h2>
-  <div class="field"><label>Name:</label> ${d.ownerName}</div>
-  <div class="field"><label>Address:</label> ${d.address}</div>
-  <div class="field"><label>Phone:</label> ${d.ownerPhone} &nbsp;&nbsp; <label>Email:</label> ${d.ownerEmail}</div>
-
-  <h2>Pet Sitter / Walker (Service Provider)</h2>
-  <div class="field">Wags and Whiskers by Misti, LLC, a Missouri limited liability company, by Misti Anderson, Managing Member</div>
-  <div class="field"><label>Phone:</label> (816) 519-1012 &nbsp;&nbsp; <label>Email:</label> wagsandwhiskersbymistillc@gmail.com</div>
-
-  <h2>1. Dog(s)/Cat(s) Information</h2>
-  <div class="field">${d.petInfo}</div>
-
-  <h2>2. Services Provided</h2>
-  <div class="checks">
-    <div>${checkbox(isDropIn)} Drop-in Visits (feeding, walks, litter box, medications, playtime, etc.)</div>
-    <div>${checkbox(isOvernight)} Overnight at sitter's home (dogs only)</div>
-    <div>${checkbox(false)} Day Care at sitter's home (dogs only)</div>
+  <div class="page cover">
+    <img src="${LOGO_URL}" alt="Wags and Whiskers by Misti, LLC — Let us spoil your pets" />
   </div>
 
-  <h2>3. Dates &amp; Times</h2>
-  <div class="field"><label>Service Date(s):</label> ${dateRange}</div>
-  ${isOvernight
-    ? `<div class="field"><label>Drop-off Time:</label> ${formatTime(d.startTime)}</div>
-  <div class="field"><label>Pick-up Time:</label> ${formatTime(d.endTime)}</div>`
-    : `<div class="field"><label>Preferred Time:</label> ${formatTime(d.startTime)}</div>`
-  }
-
-  <h2>4. Payment</h2>
-  <p>Due at end of visit or at last drop-in. Check or cash payment will be left at residence for drop-ins and held until the last drop-in.</p>
-  <div class="field"><label>Rate:</label> $${rate.toFixed(2)} ${unit}</div>
-  <div class="field"><label>Daily Total:</label> ${dailyTotal || '$__________'} &nbsp;&nbsp; <label>Visit Total:</label> ${visitTotal || '$__________'}</div>
-  <div class="field"><label>Payment Due:</label> ☐ ____________ (date) &nbsp; ☐ At time of visit &nbsp; ☐ Weekly &nbsp; ☐ Biweekly &nbsp; ☐ Monthly</div>
-  <div class="field"><label>Late Payment Fee:</label> $______ after ______ days</div>
-  <div class="field"><label>Payment Methods:</label> Cash, Venmo, Cash App, Check</div>
-
-  <h2>5. Liability &amp; Safety</h2>
-  <p>Wags and Whiskers by Misti, LLC is not liable for illness/injury unless negligent. Owner confirms dog vaccinations and behavior disclosures.</p>
-
-  <h2>6. Emergency Vet Care</h2>
-  <p>In emergencies, the sitter will contact the owner, then the emergency contact if the owner is unavailable, provide care, and be reimbursed 100% of all care within 24 hours.</p>
-
-  <h2>7. Term</h2>
-  <p>This agreement is valid until canceled in writing.</p>
-
-  <h2>8. Additional Notes</h2>
-  <p>${d.notes || '____________________________________________________________'}</p>
-
-  <div class="sign-block">
-    <div class="field"><label>Client Name:</label> ${d.ownerName}</div>
-    <div class="field"><label>Signature:</label> <span class="sign-line">&nbsp;</span> &nbsp;&nbsp; <label>Date:</label> ____________________</div>
+  <div class="page">
+    <h2 class="section-h">Welcome Letter</h2>
+    <p>Dear Pet Parent,</p>
+    <p>Welcome to Wags and Whiskers by Misti, LLC!</p>
+    <p>Thank you for trusting us to care for your beloved pet. We understand that your furry family members deserve love, attention, and dependable care when you're away. Our mission is to treat each pet as if they were our own &mdash; with gentle care, respect, and individualized attention.</p>
+    <p>I have loved and owned animals as long as I can remember. I was raised with dogs, and other small animals! My daughter and I lost our Ollie in August 2022 at 4 years old to lung cancer and would love to care for your pet until we are ready for our next family member. I am comfortable taking care of pets of any age as well as administrating medications (including injectables).</p>
+    <p>Whether it's daily walks, playtime, fresh meals, or snuggles while you're away, we're here to ensure your pet feels happy and secure.</p>
+    <p>We're so excited to have you as part of the Wags and Whiskers by Misti, LLC family!</p>
+    <p>Warmest wags and purrs,<br>Misti Anderson<br>Owner &amp; Pet Sitter<br>Wags and Whiskers by Misti, LLC</p>
   </div>
 
-  <div class="sign-block">
-    <div class="field">Wags and Whiskers by Misti, LLC, a Missouri limited liability company,</div>
-    <div class="field"><label>By:</label> <span class="sign-line">&nbsp;</span> Misti Anderson, Managing Member</div>
-    <div class="field"><label>Date:</label> ____________________</div>
+  <div class="page">
+    <h2 class="section-h">Service Menu</h2>
+    ${ratesTables()}
+  </div>
+
+  <div class="page">
+    <h1 class="doc-title">Pet Sitting Contract</h1>
+    <p class="doc-sub">Wags and Whiskers by Misti, LLC &mdash; "Let us spoil your pets"</p>
+
+    <p>This agreement is entered into on <strong>${today}</strong>, by and between:</p>
+    <div class="field"><label>Service Date(s):</label> ${dateRange}</div>
+
+    <h3 class="sub-h">Pet Owner</h3>
+    <div class="field"><label>Name:</label> ${d.ownerName}</div>
+    <div class="field"><label>Address:</label> ${d.address}</div>
+    <div class="field"><label>Phone:</label> ${d.ownerPhone} &nbsp;&nbsp; <label>Email:</label> ${d.ownerEmail}</div>
+
+    <h3 class="sub-h">Pet Sitter / Walker (Service Provider)</h3>
+    <div class="field">Wags and Whiskers by Misti, LLC, a Missouri limited liability company, by Misti Anderson, Managing Member</div>
+    <div class="field"><label>Phone:</label> (816) 519-1012 &nbsp;&nbsp; <label>Email:</label> wagsandwhiskersbymistillc@gmail.com</div>
+
+    <h3 class="sub-h">1. Dog(s)/Cat(s) Information</h3>
+    <div class="field">${d.petInfo}</div>
+
+    <h3 class="sub-h">2. Services Provided</h3>
+    <div class="checks">
+      <div>${checkbox(isDropIn)} Drop-in Visits (feeding, walks, litter box, medications, playtime, etc.)</div>
+      <div>${checkbox(isOvernight)} Overnight at sitter's home (dogs only)</div>
+      <div>${checkbox(false)} Day Care at sitter's home (dogs only)</div>
+      <div>${checkbox(false)} Other: <span class="blank-line"></span></div>
+    </div>
+
+    <h3 class="sub-h">3. Payment</h3>
+    <p>Due at end of visit or at last drop-in. Check or cash payment will be left at residence for drop-ins and held until the last drop-in.</p>
+    <div class="field"><label>Rate per (visit/day):</label> $${rate.toFixed(2)} ${unit}</div>
+    <div class="field"><label>Daily Total:</label> ${dailyTotal || '$__________'} &nbsp;&nbsp; <label>Visit Total:</label> ${visitTotal || '$__________'}</div>
+    <div class="field"><label>Payment Due:</label> ☐ ____________ (date) &nbsp; ☑ At time of visit &nbsp; ☐ Weekly &nbsp; ☐ Biweekly &nbsp; ☐ Monthly</div>
+    <div class="field"><label>Late Payment Fee:</label> $______ after ______ days</div>
+    <div class="field"><label>Payment Methods:</label> Cash, Venmo, Cash App, Check</div>
+
+    <h3 class="sub-h">4. Liability &amp; Safety</h3>
+    <p>Wags and Whiskers by Misti, LLC is not liable for illness/injury unless negligent. Owner confirms dog vaccinations and behavior disclosures.</p>
+
+    <h3 class="sub-h">5. Emergency Vet Care</h3>
+    <p>In emergencies, the sitter will contact the owner, then the emergency contact if the owner is unavailable, provide care, and be reimbursed 100% of all care within 24 hours.</p>
+
+    <h3 class="sub-h">6. Additional Notes</h3>
+    <p>${d.notes || '____________________________________________________________'}</p>
+
+    <h3 class="sub-h">7. Agreement &amp; Signatures</h3>
+    <p>Valid until canceled in writing.</p>
+    <div class="sign-block">
+      <div class="field"><label>Owner Signature:</label> <span class="sign-line">&nbsp;</span> &nbsp;&nbsp; <label>Date:</label> ____________________</div>
+    </div>
+    <div class="sign-block">
+      <div class="field">Wags and Whiskers by Misti, LLC, a Missouri limited liability company,</div>
+      <div class="field"><label>By:</label> <span class="sign-line">&nbsp;</span> Misti Anderson, Managing Member &nbsp;&nbsp; <label>Date:</label> ____________________</div>
+    </div>
+  </div>
+
+  <div class="page">
+    <h2 class="section-h">Client Intake Form (Dog)</h2>
+    <h3 class="sub-h">Client Information</h3>
+    <div class="field"><label>Name:</label> ${d.ownerName} &nbsp;&nbsp; <label>Phone:</label> ${d.ownerPhone}</div>
+    <div class="field"><label>Alternate Phone:</label> <span class="blank-line"></span></div>
+    <div class="field"><label>Vet Name:</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Vet Phone:</label> <span class="blank-line"></span></div>
+    <div class="field"><label>Emergency Contact Name:</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Phone:</label> <span class="blank-line"></span></div>
+
+    <h3 class="sub-h">Service Preferences</h3>
+    <div class="field">Days Needed: ${checkbox(false)} M &nbsp; ${checkbox(false)} T &nbsp; ${checkbox(false)} W &nbsp; ${checkbox(false)} Th &nbsp; ${checkbox(false)} F &nbsp; ${checkbox(false)} Sa &nbsp; ${checkbox(false)} Su</div>
+    <div class="field"><label>Dates Needed:</label> ${dateRange}</div>
+    <div class="field">Service Type: ${serviceTypeChecks}</div>
+    ${dropOffPickup}
+    ${dropInTimeRow}
+    <div class="field"><label>Additional Instructions:</label> ${d.notes || '<span class="blank-line"></span>'}</div>
+
+    <h3 class="sub-h">Household Info (Drop-Ins Only)</h3>
+    <div class="field">Others in home during visits? ${checkbox(false)} Yes &nbsp; ${checkbox(false)} No &nbsp; If yes: <span class="blank-line"></span></div>
+    <div class="field">Security/Access Instructions: Access ${checkbox(false)} Key &nbsp; ${checkbox(false)} Code &nbsp; Other: <span class="blank-line"></span></div>
+    <div class="field">Key Return: ${checkbox(false)} After Final Visit &nbsp; ${checkbox(false)} Retained &nbsp; ${checkbox(false)} N/A</div>
+    <div class="field">Restricted areas? ${checkbox(false)} Yes &nbsp; ${checkbox(false)} No &nbsp; If yes: <span class="blank-line"></span></div>
+  </div>
+
+  ${dogProfilePage()}
+  ${catProfilePage()}
+
+  <div class="page">
+    <h2 class="section-h">Cancellation Policy</h2>
+    <p>Cancellations made 5 or more days in advance will be refunded 100% of any money prepaid.</p>
+    <p>Cancellations made 3 days in advance will be charged 50% of the total scheduled service fee.</p>
+    <p>Cancellations made 24 hours or less in advance will be charged 100% of the total scheduled service fee.</p>
+    <p>No-shows will be charged the full rate.</p>
+    <p>Emergencies by the sitter will be communicated as soon as possible and alternate plans will be made as available.</p>
+    <p>We understand that plans change and will do our best to work with you when possible.</p>
+  </div>
+
+  <div class="page">
+    <h2 class="section-h">Client Agreement &amp; Signatures</h2>
+    <p>By signing below, I acknowledge that I have reviewed and agree to the terms outlined in this service packet from Wags and Whiskers by Misti, LLC, including:</p>
+    <ul>
+      <li>Service offerings and rates</li>
+      <li>Cancellation and refund policy</li>
+      <li>Access and emergency procedures</li>
+    </ul>
+    <p>I understand that Wags and Whiskers by Misti, LLC will make every reasonable effort to care for my pet(s) safely and responsibly. I agree to inform the sitter of any changes to my pet's health, behavior, or care needs.</p>
+
+    <div class="sign-block">
+      <div class="field"><label>Client Name:</label> ${d.ownerName}</div>
+      <div class="field"><label>Signature:</label> <span class="sign-line">&nbsp;</span> &nbsp;&nbsp; <label>Date:</label> ____________________</div>
+    </div>
+
+    <div class="sign-block">
+      <div class="field">Wags and Whiskers by Misti, LLC, a Missouri limited liability company,</div>
+      <div class="field"><label>By:</label> <span class="sign-line">&nbsp;</span> Misti Anderson, Managing Member &nbsp;&nbsp; <label>Date:</label> ____________________</div>
+    </div>
+  </div>
+
+  <div class="page">
+    <h2 class="section-h">Thank You!</h2>
+    <p>We're so grateful to have you as a client of Wags and Whiskers by Misti, LLC.</p>
+    <p>Every tail wag and happy purr reminds us why we do what we do &mdash; provide loving, professional pet care you can rely on.</p>
+    <p>If you were happy with our service, the best way to thank us is by telling a friend or leaving a review!</p>
+    <p>From our pack to yours, thank you for supporting a local small business.</p>
+    <p>With gratitude,<br>Wags and Whiskers by Misti, LLC<br>"Let us spoil your pets"</p>
   </div>
 </body>
 </html>`;
@@ -369,9 +610,12 @@ bookingForm.addEventListener('submit', async (e) => {
   const data = new FormData(bookingForm);
   const d = Object.fromEntries(data.entries());
 
-  if (DROP_IN_SERVICES.has(d.serviceType) && !d.startTime) {
-    showBookingStatus('Please choose a time slot for your visit or walk.', 'error');
-    return;
+  if (DROP_IN_SERVICES.has(d.serviceType)) {
+    if (selectedSlots.size === 0) {
+      showBookingStatus('Please choose at least one time slot for your visit.', 'error');
+      return;
+    }
+    d.startTime = [...selectedSlots].sort().join(',');
   }
 
   // Reserve the request with the booking system first — for overnight/day
@@ -388,7 +632,10 @@ bookingForm.addEventListener('submit', async (e) => {
       return;
     }
     renderCalendar();
-    if (DROP_IN_SERVICES.has(d.serviceType)) renderTimeSlots();
+    if (DROP_IN_SERVICES.has(d.serviceType)) {
+      selectedSlots.clear();
+      renderTimeSlots();
+    }
   } catch (err) {
     // booking server unreachable — fall back to email-only flow
   }

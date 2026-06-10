@@ -268,16 +268,16 @@
         <div class="form-row">
           <div class="form-group" id="startTimeGroup">
             <label for="startTime" id="startTimeLabel">Preferred Time</label>
-            <input type="time" id="startTime" name="startTime" />
+            <select id="startTime" name="startTime"></select>
           </div>
           <div class="form-group" id="endTimeGroup" hidden>
             <label for="endTime">Pick-up Time</label>
-            <input type="time" id="endTime" name="endTime" />
+            <select id="endTime" name="endTime"></select>
           </div>
         </div>
 
         <div class="form-group full" id="dropinSlotsGroup" hidden>
-          <label>Available Times</label>
+          <label>Available Times <span class="field-hint">(select one or more)</span></label>
           <div id="dropinSlots" class="dropin-slots"></div>
         </div>
 

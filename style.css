@@ -586,6 +586,12 @@ a { color: inherit; text-decoration: none; }
   margin-top: 0.6rem;
 }
 
+.field-hint {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--brown-light);
+}
+
 /* ── DROP-IN / WALK TIME SLOTS ── */
 .dropin-slots {
   display: grid;
