@@ -235,6 +235,8 @@ function buildContractHtml(d) {
     if (nights >= 10) rate = 40;
     dailyTotal = `$${rate.toFixed(2)}`;
     visitTotal = `$${(rate * nights).toFixed(2)}`;
+  } else if (isDropIn) {
+    visitTotal = `$${rate.toFixed(2)}`;
   }
 
   const dateRange = d.endDate && d.endDate !== d.startDate
@@ -273,7 +275,7 @@ function buildContractHtml(d) {
   <h2>Pet Owner</h2>
   <div class="field"><label>Name:</label> ${d.ownerName}</div>
   <div class="field"><label>Address:</label> ${d.address}</div>
-  <div class="field"><label>Phone:</label> ${d.ownerPhone || '____________________'} &nbsp;&nbsp; <label>Email:</label> ${d.ownerEmail}</div>
+  <div class="field"><label>Phone:</label> ${d.ownerPhone} &nbsp;&nbsp; <label>Email:</label> ${d.ownerEmail}</div>
 
   <h2>Pet Sitter / Walker (Service Provider)</h2>
   <div class="field">Wags and Whiskers by Misti, LLC, a Missouri limited liability company, by Misti Anderson, Managing Member</div>
