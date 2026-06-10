@@ -194,7 +194,7 @@ const bookingForm = document.getElementById('bookingForm');
 
 // Base rates, pulled from the Rates & Pricing section
 const RATE_INFO = {
-  'Drop-In Visit':             { rate: 15, unit: 'per visit (30 min, under 5 mi — see Rates & Pricing for other options)' },
+  'Drop-In Visit':             { rate: 16, unit: 'per visit (30 min, under 5 mi — see Rates & Pricing for other options)' },
   'Overnight Stay':            { rate: 45, unit: 'per night' },
 };
 
