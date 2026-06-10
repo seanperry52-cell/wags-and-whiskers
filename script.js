@@ -132,22 +132,16 @@ const DROP_IN_SERVICES = new Set(['Drop-In Visit']);
 
 const serviceTypeSelect = document.getElementById('serviceType');
 const startDateInput = document.getElementById('startDate');
+const startTimeGroup = document.getElementById('startTimeGroup');
+const startTimeLabel = document.getElementById('startTimeLabel');
 const startTimeInput = document.getElementById('startTime');
+const endTimeGroup = document.getElementById('endTimeGroup');
+const endTimeInput = document.getElementById('endTime');
+const dropinSlotsGroup = document.getElementById('dropinSlotsGroup');
 const dropinSlots = document.getElementById('dropinSlots');
 
 async function renderTimeSlots() {
-  const isDropIn = DROP_IN_SERVICES.has(serviceTypeSelect.value);
   const date = startDateInput.value;
-
-  if (!isDropIn) {
-    startTimeInput.style.display = '';
-    dropinSlots.hidden = true;
-    dropinSlots.innerHTML = '';
-    return;
-  }
-
-  startTimeInput.style.display = 'none';
-  dropinSlots.hidden = false;
 
   if (!date) {
     dropinSlots.innerHTML = '<p class="slots-loading">Pick a date above to see open times.</p>';
@@ -179,15 +173,42 @@ async function renderTimeSlots() {
   }
 }
 
+function updateTimeFields() {
+  const serviceType = serviceTypeSelect.value;
+  const isDropIn = DROP_IN_SERVICES.has(serviceType);
+  const isOvernight = serviceType === 'Overnight Stay';
+
+  if (isOvernight) {
+    startTimeGroup.hidden = false;
+    startTimeLabel.textContent = 'Drop-off Time';
+    endTimeGroup.hidden = false;
+    dropinSlotsGroup.hidden = true;
+    dropinSlots.innerHTML = '';
+  } else if (isDropIn) {
+    startTimeGroup.hidden = true;
+    endTimeGroup.hidden = true;
+    endTimeInput.value = '';
+    dropinSlotsGroup.hidden = false;
+    renderTimeSlots();
+  } else {
+    startTimeGroup.hidden = false;
+    startTimeLabel.textContent = 'Preferred Time';
+    endTimeGroup.hidden = true;
+    endTimeInput.value = '';
+    dropinSlotsGroup.hidden = true;
+    dropinSlots.innerHTML = '';
+  }
+}
+
 serviceTypeSelect.addEventListener('change', () => {
   startTimeInput.value = '';
-  renderTimeSlots();
+  updateTimeFields();
 });
 startDateInput.addEventListener('change', () => {
   startTimeInput.value = '';
-  renderTimeSlots();
+  if (DROP_IN_SERVICES.has(serviceTypeSelect.value)) renderTimeSlots();
 });
-renderTimeSlots();
+updateTimeFields();
 
 // ── Booking form -> email + pre-filled printable contract ──────────────────
 const bookingForm = document.getElementById('bookingForm');
@@ -293,7 +314,11 @@ function buildContractHtml(d) {
 
   <h2>3. Dates &amp; Times</h2>
   <div class="field"><label>Service Date(s):</label> ${dateRange}</div>
-  <div class="field"><label>Preferred Time:</label> ${formatTime(d.startTime)}</div>
+  ${isOvernight
+    ? `<div class="field"><label>Drop-off Time:</label> ${formatTime(d.startTime)}</div>
+  <div class="field"><label>Pick-up Time:</label> ${formatTime(d.endTime)}</div>`
+    : `<div class="field"><label>Preferred Time:</label> ${formatTime(d.startTime)}</div>`
+  }
 
   <h2>4. Payment</h2>
   <p>Due at end of visit or at last drop-in. Check or cash payment will be left at residence for drop-ins and held until the last drop-in.</p>
@@ -363,7 +388,7 @@ bookingForm.addEventListener('submit', async (e) => {
       return;
     }
     renderCalendar();
-    renderTimeSlots();
+    if (DROP_IN_SERVICES.has(d.serviceType)) renderTimeSlots();
   } catch (err) {
     // booking server unreachable — fall back to email-only flow
   }
