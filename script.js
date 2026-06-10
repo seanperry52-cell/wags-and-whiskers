@@ -126,10 +126,9 @@ document.getElementById('calNext').addEventListener('click', () => {
 });
 renderCalendar();
 
-// ── Drop-in / walk time slots ───────────────────────────────────────────
-// Drop-in visits and walks are the same for scheduling purposes — each
-// books a single 30-minute slot, picked from the same availability data.
-const DROP_IN_SERVICES = new Set(['Drop-In Visit', 'Dog Walking']);
+// ── Drop-in visit time slots ────────────────────────────────────────────
+// Each drop-in visit books a single 30-minute slot.
+const DROP_IN_SERVICES = new Set(['Drop-In Visit']);
 
 const serviceTypeSelect = document.getElementById('serviceType');
 const startDateInput = document.getElementById('startDate');
@@ -197,7 +196,6 @@ const bookingForm = document.getElementById('bookingForm');
 const RATE_INFO = {
   'Drop-In Visit':             { rate: 15, unit: 'per visit (30 min, under 5 mi — see Rates & Pricing for other options)' },
   'Overnight Stay':            { rate: 45, unit: 'per night' },
-  'Dog Walking':               { rate: 15, unit: 'per visit (30 min, under 5 mi — see Rates & Pricing for other options)' },
 };
 
 function formatDate(value) {
@@ -226,7 +224,6 @@ function buildContractHtml(d) {
   const serviceType = d.serviceType;
   const isDropIn = serviceType === 'Drop-In Visit';
   const isOvernight = serviceType === 'Overnight Stay';
-  const isOther = serviceType === 'Dog Walking';
 
   const nights = nightsBetween(d.startDate, d.endDate);
   let rate = RATE_INFO[serviceType]?.rate ?? 0;
@@ -290,7 +287,6 @@ function buildContractHtml(d) {
     <div>${checkbox(isDropIn)} Drop-in Visits (feeding, walks, litter box, medications, playtime, etc.)</div>
     <div>${checkbox(isOvernight)} Overnight at sitter's home (dogs only)</div>
     <div>${checkbox(false)} Day Care at sitter's home (dogs only)</div>
-    <div>${checkbox(isOther)} Other: ${isOther ? serviceType : '_____________'}</div>
   </div>
 
   <h2>3. Dates &amp; Times</h2>
