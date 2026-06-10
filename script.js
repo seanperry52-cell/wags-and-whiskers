@@ -198,7 +198,6 @@ const RATE_INFO = {
   'Drop-In Visit':             { rate: 15, unit: 'per visit (30 min, under 5 mi — see Rates & Pricing for other options)' },
   'Overnight Stay':            { rate: 45, unit: 'per night' },
   'Dog Walking':               { rate: 15, unit: 'per visit (30 min, under 5 mi — see Rates & Pricing for other options)' },
-  'Medication / Special Care': { rate: 0,  unit: 'add-on, no charge' },
 };
 
 function formatDate(value) {
@@ -227,7 +226,7 @@ function buildContractHtml(d) {
   const serviceType = d.serviceType;
   const isDropIn = serviceType === 'Drop-In Visit';
   const isOvernight = serviceType === 'Overnight Stay';
-  const isOther = serviceType === 'Dog Walking' || serviceType === 'Medication / Special Care';
+  const isOther = serviceType === 'Dog Walking';
 
   const nights = nightsBetween(d.startDate, d.endDate);
   let rate = RATE_INFO[serviceType]?.rate ?? 0;
