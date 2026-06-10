@@ -355,50 +355,27 @@ function ratesTables() {
   <p>We tailor each visit to your pet's needs!</p>`;
 }
 
-function dogProfilePage() {
+function petProfilePage(title, nameLabel, lastSectionLabel, x) {
+  const blankLine = '<span class="blank-line"></span>';
+  const blankBlock = '____________________________________________________________';
   return `
   <div class="page">
-    <h2 class="section-h">Dog Profile Sheet (One Per Dog)</h2>
-    <div class="field"><label>Dog's Name:</label> <span class="blank-line"></span></div>
-    <div class="field"><label>Breed:</label> <span class="blank-line"></span></div>
-    <div class="field"><label>Age:</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Weight:</label> <span class="blank-line"></span></div>
-    <div class="field"><label>Health/Allergies:</label> <span class="blank-line"></span></div>
-    <div class="field"><label>Date of Last Vaccinations:</label> <span class="blank-line"></span></div>
+    <h2 class="section-h">${title}</h2>
+    <div class="field"><label>${nameLabel}:</label> ${x.petName || blankLine}</div>
+    <div class="field"><label>Breed:</label> ${x.petBreed || blankLine}</div>
+    <div class="field"><label>Age:</label> ${x.petAge || blankLine} &nbsp;&nbsp; <label>Weight:</label> ${x.petWeight || blankLine}</div>
+    <div class="field"><label>Date of Last Vaccinations:</label> ${x.petVaccDate ? formatDate(x.petVaccDate) : blankLine}</div>
     <h3 class="sub-h">Feeding Instructions</h3>
-    <div class="blank-block"></div>
+    <p>${x.feeding || blankBlock}</p>
     <h3 class="sub-h">Medications</h3>
-    <div class="blank-block"></div>
+    <p>${x.medications || blankBlock}</p>
     <h3 class="sub-h">Allergies or Health Concerns</h3>
-    <div class="blank-block"></div>
+    <p>${x.petAllergies || blankBlock}</p>
     <h3 class="sub-h">Behavior Notes (shy, anxious, aggressive, etc.)</h3>
-    <div class="blank-block"></div>
+    <p>${x.petBehavior || blankBlock}</p>
     <h3 class="sub-h">Favorite Toys/Activities</h3>
-    <div class="blank-block"></div>
-    <h3 class="sub-h">Additional Notes</h3>
-    <div class="blank-block"></div>
-  </div>`;
-}
-
-function catProfilePage() {
-  return `
-  <div class="page">
-    <h2 class="section-h">Cat Profile Sheet (One Per Cat)</h2>
-    <div class="field"><label>Cat's Name:</label> <span class="blank-line"></span></div>
-    <div class="field"><label>Breed:</label> <span class="blank-line"></span></div>
-    <div class="field"><label>Age:</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Weight:</label> <span class="blank-line"></span></div>
-    <div class="field"><label>Health/Allergies:</label> <span class="blank-line"></span></div>
-    <div class="field"><label>Date of Last Vaccinations:</label> <span class="blank-line"></span></div>
-    <h3 class="sub-h">Feeding Instructions</h3>
-    <div class="blank-block"></div>
-    <h3 class="sub-h">Medications</h3>
-    <div class="blank-block"></div>
-    <h3 class="sub-h">Allergies or Health Concerns</h3>
-    <div class="blank-block"></div>
-    <h3 class="sub-h">Behavior Notes (shy, anxious, aggressive, etc.)</h3>
-    <div class="blank-block"></div>
-    <h3 class="sub-h">Favorite Toys/Activities</h3>
-    <div class="blank-block"></div>
-    <h3 class="sub-h">Anything Else We Should Know</h3>
+    <p>${x.petFavorites || blankBlock}</p>
+    <h3 class="sub-h">${lastSectionLabel}</h3>
     <div class="blank-block"></div>
   </div>`;
 }
@@ -430,6 +407,11 @@ function buildContractHtml(d) {
     : formatDate(d.startDate);
 
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const blankLine = '<span class="blank-line"></span>';
+  const petType = (d.petType || '').trim();
+  const showDog = !petType || petType === 'Dog' || petType === 'Both';
+  const showCat = !petType || petType === 'Cat' || petType === 'Both';
 
   const serviceTypeChecks = `${checkbox(isDropIn)} Drop-in &nbsp;&nbsp; ${checkbox(isOvernight)} Overnight &nbsp;&nbsp; ${checkbox(false)} Daycare &nbsp;&nbsp; ${checkbox(false)} Other: <span class="blank-line"></span>`;
 
@@ -527,12 +509,12 @@ function buildContractHtml(d) {
   </div>
 
   <div class="page">
-    <h2 class="section-h">Client Intake Form (Dog)</h2>
+    <h2 class="section-h">Client Intake Form</h2>
     <h3 class="sub-h">Client Information</h3>
     <div class="field"><label>Name:</label> ${d.ownerName} &nbsp;&nbsp; <label>Phone:</label> ${d.ownerPhone}</div>
-    <div class="field"><label>Alternate Phone:</label> <span class="blank-line"></span></div>
-    <div class="field"><label>Vet Name:</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Vet Phone:</label> <span class="blank-line"></span></div>
-    <div class="field"><label>Emergency Contact Name:</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Phone:</label> <span class="blank-line"></span></div>
+    <div class="field"><label>Alternate Phone:</label> ${d.altPhone || blankLine}</div>
+    <div class="field"><label>Vet Name:</label> ${d.vetName || blankLine} &nbsp;&nbsp; <label>Vet Phone:</label> ${d.vetPhone || blankLine}</div>
+    <div class="field"><label>Emergency Contact Name:</label> ${d.emergencyName || blankLine} &nbsp;&nbsp; <label>Phone:</label> ${d.emergencyPhone || blankLine}</div>
 
     <h3 class="sub-h">Service Preferences</h3>
     <div class="field">Days Needed: ${checkbox(false)} M &nbsp; ${checkbox(false)} T &nbsp; ${checkbox(false)} W &nbsp; ${checkbox(false)} Th &nbsp; ${checkbox(false)} F &nbsp; ${checkbox(false)} Sa &nbsp; ${checkbox(false)} Su</div>
@@ -540,17 +522,17 @@ function buildContractHtml(d) {
     <div class="field">Service Type: ${serviceTypeChecks}</div>
     ${dropOffPickup}
     ${dropInTimeRow}
-    <div class="field"><label>Additional Instructions:</label> ${d.notes || '<span class="blank-line"></span>'}</div>
+    <div class="field"><label>Additional Instructions:</label> ${d.notes || blankLine}</div>
 
     <h3 class="sub-h">Household Info (Drop-Ins Only)</h3>
-    <div class="field">Others in home during visits? ${checkbox(false)} Yes &nbsp; ${checkbox(false)} No &nbsp; If yes: <span class="blank-line"></span></div>
-    <div class="field">Security/Access Instructions: Access ${checkbox(false)} Key &nbsp; ${checkbox(false)} Code &nbsp; Other: <span class="blank-line"></span></div>
-    <div class="field">Key Return: ${checkbox(false)} After Final Visit &nbsp; ${checkbox(false)} Retained &nbsp; ${checkbox(false)} N/A</div>
-    <div class="field">Restricted areas? ${checkbox(false)} Yes &nbsp; ${checkbox(false)} No &nbsp; If yes: <span class="blank-line"></span></div>
+    <div class="field">Others in home during visits? ${checkbox(!!d.othersHome)} Yes &nbsp; ${checkbox(!d.othersHome)} No &nbsp; If yes: ${d.othersHome || blankLine}</div>
+    <div class="field">Access Instructions: ${d.accessInstructions || blankLine}</div>
+    <div class="field">Key Return: ${checkbox(d.keyReturn === 'After Final Visit')} After Final Visit &nbsp; ${checkbox(d.keyReturn === 'Retained')} Sitter Keeps a Copy &nbsp; ${checkbox(!d.keyReturn)} N/A</div>
+    <div class="field">Restricted areas? ${checkbox(!!d.restrictedAreas)} Yes &nbsp; ${checkbox(!d.restrictedAreas)} No &nbsp; If yes: ${d.restrictedAreas || blankLine}</div>
   </div>
 
-  ${dogProfilePage()}
-  ${catProfilePage()}
+  ${showDog ? petProfilePage('Dog Profile Sheet (One Per Dog)', "Dog's Name", 'Additional Notes', d) : ''}
+  ${showCat ? petProfilePage('Cat Profile Sheet (One Per Cat)', "Cat's Name", 'Anything Else We Should Know', d) : ''}
 
   <div class="page">
     <h2 class="section-h">Cancellation Policy</h2>
@@ -652,6 +634,8 @@ bookingForm.addEventListener('submit', async (e) => {
     `Pet(s) Info: ${d.petInfo}`,
     `Address: ${d.address}`,
     `Notes: ${d.notes || 'N/A'}`,
+    `Emergency Contact: ${d.emergencyName || 'N/A'} ${d.emergencyPhone || ''}`.trim(),
+    `Vet: ${d.vetName || 'N/A'} ${d.vetPhone || ''}`.trim(),
   ];
   const body = lines.join('\n');
   const mailtoLink = `mailto:wagsandwhiskersbymistillc@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;

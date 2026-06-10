@@ -296,6 +296,113 @@
           <textarea id="notes" name="notes" rows="4" placeholder="Anything else we should know?"></textarea>
         </div>
 
+        <h3 class="form-section-title">Emergency &amp; Vet Info <span class="field-hint">(optional)</span></h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="altPhone">Alternate Phone</label>
+            <input type="tel" id="altPhone" name="altPhone" />
+          </div>
+          <div class="form-group">
+            <label for="emergencyName">Emergency Contact Name</label>
+            <input type="text" id="emergencyName" name="emergencyName" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="emergencyPhone">Emergency Contact Phone</label>
+            <input type="tel" id="emergencyPhone" name="emergencyPhone" />
+          </div>
+          <div class="form-group">
+            <label for="vetName">Vet Name</label>
+            <input type="text" id="vetName" name="vetName" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="vetPhone">Vet Phone</label>
+          <input type="tel" id="vetPhone" name="vetPhone" />
+        </div>
+
+        <h3 class="form-section-title">Pet Profile <span class="field-hint">(optional, for our pet profile sheet)</span></h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="petName">Pet's Name</label>
+            <input type="text" id="petName" name="petName" />
+          </div>
+          <div class="form-group">
+            <label for="petType">Pet Type</label>
+            <select id="petType" name="petType">
+              <option value="" selected>Select type</option>
+              <option value="Dog">Dog</option>
+              <option value="Cat">Cat</option>
+              <option value="Both">Dog &amp; Cat</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="petBreed">Breed</label>
+            <input type="text" id="petBreed" name="petBreed" />
+          </div>
+          <div class="form-group">
+            <label for="petAge">Age</label>
+            <input type="text" id="petAge" name="petAge" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="petWeight">Weight</label>
+            <input type="text" id="petWeight" name="petWeight" />
+          </div>
+          <div class="form-group">
+            <label for="petVaccDate">Date of Last Vaccinations</label>
+            <input type="date" id="petVaccDate" name="petVaccDate" />
+          </div>
+        </div>
+        <div class="form-group full">
+          <label for="feeding">Feeding Instructions</label>
+          <textarea id="feeding" name="feeding" rows="2"></textarea>
+        </div>
+        <div class="form-group full">
+          <label for="medications">Medications</label>
+          <textarea id="medications" name="medications" rows="2"></textarea>
+        </div>
+        <div class="form-group full">
+          <label for="petAllergies">Allergies / Health Concerns</label>
+          <textarea id="petAllergies" name="petAllergies" rows="2"></textarea>
+        </div>
+        <div class="form-group full">
+          <label for="petBehavior">Behavior Notes <span class="field-hint">(shy, anxious, aggressive, etc.)</span></label>
+          <textarea id="petBehavior" name="petBehavior" rows="2"></textarea>
+        </div>
+        <div class="form-group full">
+          <label for="petFavorites">Favorite Toys / Activities</label>
+          <input type="text" id="petFavorites" name="petFavorites" />
+        </div>
+
+        <h3 class="form-section-title">Home Access <span class="field-hint">(for drop-in visits — optional)</span></h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="othersHome">Others Home During Visits</label>
+            <input type="text" id="othersHome" name="othersHome" placeholder="Leave blank if no one else" />
+          </div>
+          <div class="form-group">
+            <label for="restrictedAreas">Restricted Areas</label>
+            <input type="text" id="restrictedAreas" name="restrictedAreas" placeholder="Leave blank if none" />
+          </div>
+        </div>
+        <div class="form-group full">
+          <label for="accessInstructions">Access Instructions</label>
+          <input type="text" id="accessInstructions" name="accessInstructions" placeholder="e.g. lockbox code, key location" />
+        </div>
+        <div class="form-group">
+          <label for="keyReturn">Key Return Preference</label>
+          <select id="keyReturn" name="keyReturn">
+            <option value="">N/A</option>
+            <option value="After Final Visit">Return After Final Visit</option>
+            <option value="Retained">Sitter Keeps a Copy</option>
+          </select>
+        </div>
+
         <p id="bookingStatus" class="booking-status" hidden></p>
 
         <button type="submit" class="btn btn-primary btn-submit">Send Booking Request</button>
