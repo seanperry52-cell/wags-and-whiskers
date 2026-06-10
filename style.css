@@ -492,6 +492,111 @@ a { color: inherit; text-decoration: none; }
   margin: 0 auto;
 }
 
+/* ── AVAILABILITY CALENDAR ── */
+.calendar-card {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 1.8rem;
+  box-shadow: var(--shadow);
+  max-width: 700px;
+  margin: 0 auto 2.5rem;
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.calendar-header h3 {
+  font-size: 1.15rem;
+}
+
+.cal-nav {
+  background: var(--cream-soft);
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--brown);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.cal-nav:hover { background: var(--dog); color: #fff; }
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.cal-weekday {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--brown-light);
+  padding-bottom: 0.4rem;
+}
+
+.cal-day {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.cal-available { background: var(--cream-soft); color: var(--brown); }
+.cal-booked { background: #f3d9c4; color: var(--rust); }
+.cal-unavailable { background: #e8e4dc; color: #aaa; text-decoration: line-through; }
+.cal-today { box-shadow: inset 0 0 0 2px var(--rust); }
+
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  justify-content: center;
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: var(--brown-light);
+}
+
+.calendar-legend .dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 3px;
+  margin-right: 0.3rem;
+  vertical-align: middle;
+}
+
+.dot-available { background: var(--cream-soft); border: 1px solid #ddd; }
+.dot-booked { background: #f3d9c4; }
+.dot-unavailable { background: #e8e4dc; }
+
+.calendar-note {
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--brown-light);
+  margin-top: 0.6rem;
+}
+
+.booking-status {
+  text-align: center;
+  font-weight: 700;
+  padding: 0.8rem;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+}
+
+.booking-status.error { background: #f3d6d2; color: var(--rust); }
+.booking-status.success { background: #d6ecd9; color: #3a6b46; }
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

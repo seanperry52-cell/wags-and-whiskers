@@ -61,6 +61,71 @@ window.addEventListener('scroll', () => {
     : '0 2px 16px rgba(74,55,40,0.06)';
 }, { passive: true });
 
+// ── Availability calendar ───────────────────────────────────────────────────
+const BOOKING_API = 'https://desktop-rac3kc3.tail27701f.ts.net/wags-booking';
+
+function ymd(year, month, day) {
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+const calMonth = new Date();
+calMonth.setDate(1);
+
+async function renderCalendar() {
+  const calEl = document.getElementById('availabilityCalendar');
+  const monthLabel = document.getElementById('calMonthLabel');
+  const year = calMonth.getFullYear();
+  const month = calMonth.getMonth();
+  monthLabel.textContent = calMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const from = ymd(year, month, 1);
+  const to = ymd(year, month, daysInMonth);
+
+  let availability = { blocked: [], booked: [] };
+  try {
+    const res = await fetch(`${BOOKING_API}/api/availability?from=${from}&to=${to}`);
+    if (res.ok) availability = await res.json();
+  } catch (err) {
+    // booking server unreachable — show calendar without availability data
+  }
+
+  const blockedSet = new Set(availability.blocked || []);
+  const bookedSet = new Set(availability.booked || []);
+  const todayStr = ymd(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+
+  calEl.innerHTML = '';
+  ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(d => {
+    const cell = document.createElement('div');
+    cell.className = 'cal-weekday';
+    cell.textContent = d;
+    calEl.appendChild(cell);
+  });
+  for (let i = 0; i < firstWeekday; i++) calEl.appendChild(document.createElement('div'));
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = ymd(year, month, day);
+    const cell = document.createElement('div');
+    cell.className = 'cal-day';
+    if (dateStr === todayStr) cell.classList.add('cal-today');
+    if (blockedSet.has(dateStr)) cell.classList.add('cal-unavailable');
+    else if (bookedSet.has(dateStr)) cell.classList.add('cal-booked');
+    else cell.classList.add('cal-available');
+    cell.textContent = day;
+    calEl.appendChild(cell);
+  }
+}
+
+document.getElementById('calPrev').addEventListener('click', () => {
+  calMonth.setMonth(calMonth.getMonth() - 1);
+  renderCalendar();
+});
+document.getElementById('calNext').addEventListener('click', () => {
+  calMonth.setMonth(calMonth.getMonth() + 1);
+  renderCalendar();
+});
+renderCalendar();
+
 // ── Booking form -> email + pre-filled printable contract ──────────────────
 const bookingForm = document.getElementById('bookingForm');
 
@@ -203,11 +268,38 @@ function buildContractHtml(d) {
 </html>`;
 }
 
-bookingForm.addEventListener('submit', (e) => {
+const bookingStatus = document.getElementById('bookingStatus');
+
+function showBookingStatus(message, type) {
+  bookingStatus.textContent = message;
+  bookingStatus.className = `booking-status ${type}`;
+  bookingStatus.hidden = false;
+}
+
+bookingForm.addEventListener('submit', async (e) => {
   e.preventDefault();
+  bookingStatus.hidden = true;
 
   const data = new FormData(bookingForm);
   const d = Object.fromEntries(data.entries());
+
+  // Reserve the request with the booking system first — for overnight/day
+  // care this checks the dates are still available before we proceed.
+  try {
+    const res = await fetch(`${BOOKING_API}/api/bookings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(d),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showBookingStatus(err.error || 'Something went wrong submitting your request. Please try again.', 'error');
+      return;
+    }
+    renderCalendar();
+  } catch (err) {
+    // booking server unreachable — fall back to email-only flow
+  }
 
   const subject = `Booking Request: ${d.serviceType} - ${d.ownerName}`;
   const lines = [
@@ -232,6 +324,7 @@ bookingForm.addEventListener('submit', (e) => {
     contractWin.document.close();
   }
 
+  showBookingStatus('Request received! Opening your email and contract now...', 'success');
   window.location.href = mailtoLink;
 });
 

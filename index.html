@@ -212,6 +212,21 @@
       <h2 class="section-title">Book a Visit</h2>
       <p class="booking-sub">Fill out the form below and we'll get back to you to confirm details.</p>
 
+      <div class="calendar-card reveal">
+        <div class="calendar-header">
+          <button type="button" id="calPrev" class="cal-nav" aria-label="Previous month">‹</button>
+          <h3 id="calMonthLabel"></h3>
+          <button type="button" id="calNext" class="cal-nav" aria-label="Next month">›</button>
+        </div>
+        <div id="availabilityCalendar" class="calendar-grid"></div>
+        <div class="calendar-legend">
+          <span><i class="dot dot-available"></i> Available</span>
+          <span><i class="dot dot-booked"></i> Booked (overnight/day care)</span>
+          <span><i class="dot dot-unavailable"></i> Unavailable</span>
+        </div>
+        <p class="calendar-note">Drop-in visits and walks aren't shown here — those don't take a full day.</p>
+      </div>
+
       <form id="bookingForm" class="booking-form reveal">
         <div class="form-row">
           <div class="form-group">
@@ -273,6 +288,8 @@
           <label for="notes">Additional Notes</label>
           <textarea id="notes" name="notes" rows="4" placeholder="Anything else we should know?"></textarea>
         </div>
+
+        <p id="bookingStatus" class="booking-status" hidden></p>
 
         <button type="submit" class="btn btn-primary btn-submit">Send Booking Request</button>
         <p class="booking-note">This will open your email app with a pre-filled message to <strong>wagsandwhiskersbymistillc@gmail.com</strong>, and open a pre-filled service contract you can print and sign.</p>
