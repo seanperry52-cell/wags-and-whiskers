@@ -282,14 +282,14 @@ const HOME_LAT = 39.2077088;
 const HOME_LON = -94.5462325;
 const DROP_IN_RATES = { near: 16, far: 18 };
 
-function milesBetween(lat1, lon1, lat2, lon2) {
-  const R = 3958.8; // Earth radius in miles
-  const toRad = deg => (deg * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+// Driving distance (in miles) from home to the given point, via the public
+// OSRM routing API. Falls back to null if the route can't be computed.
+async function drivingMilesFromHome(lat, lon) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${HOME_LON},${HOME_LAT};${lon},${lat}?overview=false`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.code !== 'Ok' || !data.routes?.length) return null;
+  return data.routes[0].distance / 1609.34; // meters -> miles
 }
 
 const addressInput = document.getElementById('address');
@@ -315,7 +315,12 @@ async function updateDistancePricing() {
       return;
     }
     const { lat, lon } = results[0];
-    const miles = milesBetween(HOME_LAT, HOME_LON, Number(lat), Number(lon));
+    const miles = await drivingMilesFromHome(Number(lat), Number(lon));
+    if (miles == null) {
+      addressDistanceNote.textContent = "Couldn't calculate driving distance — drop-in rate will be confirmed at booking.";
+      distanceMilesInput.value = '';
+      return;
+    }
     distanceMilesInput.value = miles.toFixed(2);
 
     const isFar = miles >= 5;
