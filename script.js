@@ -599,10 +599,11 @@ function buildContractHtml(d) {
     if (over24Fee) visitTotalNote = ` (incl. $${over24Fee.toFixed(2)} over-24-hour fee)`;
   } else if (isDropIn) {
     const isFar = parseFloat(d.distanceMiles) >= 5;
-    const extended = d.clientType === 'Ongoing';
+    const daySpan = (d.endDate && d.endDate !== d.startDate) ? nights + 1 : 1;
+    const extended = daySpan >= 14;
     const rates = extended ? DROP_IN_EXTENDED_RATES : DROP_IN_RATES;
     rate = (isFar ? rates.far : rates.near) + (isPuppy ? PUPPY_ADDON : 0);
-    unit = `per visit (30 min, ${isFar ? '5+' : 'under 5'} mi from Misti's home${extended ? ', extended/recurring rate' : ''}${isPuppy ? ' + puppy add-on' : ''})`;
+    unit = `per visit (30 min, ${isFar ? '5+' : 'under 5'} mi from Misti's home${extended ? ', extended rate (14+ day request)' : ''}${isPuppy ? ' + puppy add-on' : ''})`;
     visitTotal = `$${(rate * visitCount).toFixed(2)}`;
   }
 
