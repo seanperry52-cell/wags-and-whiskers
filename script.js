@@ -826,6 +826,19 @@ bookingForm.addEventListener('submit', async (e) => {
       showBookingStatus(err.error || 'Something went wrong submitting your request. Please try again.', 'error');
       return;
     }
+    const { id: bookingId } = await res.json();
+
+    const photoFiles = document.getElementById('petPhotos').files;
+    if (bookingId && photoFiles.length > 0) {
+      const photoData = new FormData();
+      for (const file of photoFiles) photoData.append('photos', file);
+      try {
+        await fetch(`${BOOKING_API}/api/bookings/${bookingId}/photos`, { method: 'POST', body: photoData });
+      } catch (err) {
+        // photo upload failure shouldn't block the booking request
+      }
+    }
+
     renderCalendar();
     if (DROP_IN_SERVICES.has(d.serviceType)) {
       selectedSlots.clear();
