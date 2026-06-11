@@ -234,8 +234,9 @@ function updateTimeFields() {
   const serviceType = serviceTypeSelect.value;
   const isDropIn = DROP_IN_SERVICES.has(serviceType);
   const isOvernight = serviceType === 'Overnight Stay';
+  const isDayCare = serviceType === 'Day Care';
 
-  if (isOvernight) {
+  if (isOvernight || isDayCare) {
     startTimeGroup.hidden = false;
     startTimeLabel.textContent = 'Drop-off Time';
     endTimeGroup.hidden = false;
@@ -349,6 +350,7 @@ ownerPhoneInput.addEventListener('blur', tryReturningClientLookup);
 const RATE_INFO = {
   'Drop-In Visit':             { rate: 16, unit: 'per visit (30 min, under 5 mi — see Rates & Pricing for other options)' },
   'Overnight Stay':            { rate: 45, unit: 'per night' },
+  'Day Care':                  { rate: 40, unit: 'per day' },
 };
 
 // ── Distance-based drop-in pricing ──────────────────────────────────────────
@@ -573,6 +575,7 @@ function buildContractHtml(d) {
   const serviceType = d.serviceType;
   const isDropIn = serviceType === 'Drop-In Visit';
   const isOvernight = serviceType === 'Overnight Stay';
+  const isDayCare = serviceType === 'Day Care';
 
   const dropInTimes = isDropIn ? String(d.startTime || '').split(',').map(t => t.trim()).filter(Boolean) : [];
   const visitCount = isDropIn ? Math.max(dropInTimes.length, 1) : 1;
@@ -597,6 +600,14 @@ function buildContractHtml(d) {
     dailyTotal = `$${rate.toFixed(2)}`;
     visitTotal = `$${(rate * nights + over24Fee).toFixed(2)}`;
     if (over24Fee) visitTotalNote = ` (incl. $${over24Fee.toFixed(2)} over-24-hour fee)`;
+  } else if (isDayCare) {
+    if (isPuppy) {
+      rate = 45;
+      unit = 'per day (puppy)';
+    }
+    const days = (d.endDate && d.endDate !== d.startDate) ? nights + 1 : 1;
+    dailyTotal = `$${rate.toFixed(2)}`;
+    visitTotal = `$${(rate * days).toFixed(2)}`;
   } else if (isDropIn) {
     const isFar = parseFloat(d.distanceMiles) >= 5;
     const daySpan = (d.endDate && d.endDate !== d.startDate) ? nights + 1 : 1;
@@ -622,9 +633,9 @@ function buildContractHtml(d) {
   const showDog = !petType || petType === 'Dog' || petType === 'Both';
   const showCat = !petType || petType === 'Cat' || petType === 'Both';
 
-  const serviceTypeChecks = `${checkbox(isDropIn)} Drop-in &nbsp;&nbsp; ${checkbox(isOvernight)} Overnight &nbsp;&nbsp; ${checkbox(false)} Daycare &nbsp;&nbsp; ${checkbox(false)} Other: <span class="blank-line"></span>`;
+  const serviceTypeChecks = `${checkbox(isDropIn)} Drop-in &nbsp;&nbsp; ${checkbox(isOvernight)} Overnight &nbsp;&nbsp; ${checkbox(isDayCare)} Daycare &nbsp;&nbsp; ${checkbox(false)} Other: <span class="blank-line"></span>`;
 
-  const dropOffPickup = isOvernight
+  const dropOffPickup = (isOvernight || isDayCare)
     ? `<div class="field"><label>Drop-off Time:</label> ${formatTime(d.startTime)} &nbsp;&nbsp; <label>Pick-up Time:</label> ${formatTime(d.endTime)}</div>`
     : `<div class="field"><label>Drop-off Time:</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Pick-up Time:</label> <span class="blank-line"></span></div>`;
 
@@ -685,7 +696,7 @@ function buildContractHtml(d) {
     <div class="checks">
       <div>${checkbox(isDropIn)} Drop-in Visits (feeding, walks, litter box, medications, playtime, etc.)</div>
       <div>${checkbox(isOvernight)} Overnight at sitter's home (dogs only)</div>
-      <div>${checkbox(false)} Day Care at sitter's home (dogs only)</div>
+      <div>${checkbox(isDayCare)} Day Care at sitter's home (dogs only)</div>
       <div>${checkbox(false)} Other: <span class="blank-line"></span></div>
     </div>
 
