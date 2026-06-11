@@ -298,6 +298,53 @@ updateBookingTypeFields();
 // ── Booking form -> email + pre-filled printable contract ──────────────────
 const bookingForm = document.getElementById('bookingForm');
 
+// ── Returning-client lookup ─────────────────────────────────────────────────
+// Once both email and phone are filled in, check whether this is a returning
+// client and pre-fill their saved vet/emergency/pet info so they don't have
+// to re-enter it on every booking.
+const ownerEmailInput = document.getElementById('ownerEmail');
+const ownerPhoneInput = document.getElementById('ownerPhone');
+const returningClientNote = document.getElementById('returningClientNote');
+let returningClientChecked = false;
+
+async function tryReturningClientLookup() {
+  const email = ownerEmailInput.value.trim();
+  const phone = ownerPhoneInput.value.trim();
+  if (!email || !phone || returningClientChecked) return;
+  returningClientChecked = true;
+
+  try {
+    const res = await fetch(`${BOOKING_API}/api/client-lookup?email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.found) return;
+
+    const fillIfEmpty = (el, value) => {
+      if (el && !el.value && value) el.value = value;
+    };
+
+    fillIfEmpty(document.getElementById('petInfo'), data.petInfo);
+    fillIfEmpty(addressInput, data.address);
+    for (const [key, value] of Object.entries(data.fields || {})) {
+      const el = bookingForm.elements[key];
+      if (!el) continue;
+      if (el.tagName === 'SELECT' || el.type === 'date') {
+        if (!el.value) el.value = value;
+      } else {
+        fillIfEmpty(el, value);
+      }
+    }
+
+    if (addressInput.value) updateDistancePricing();
+    returningClientNote.textContent = "Welcome back! We've filled in your saved info — please review and update anything that's changed.";
+  } catch {
+    // lookup is a convenience feature — fail silently
+  }
+}
+
+ownerEmailInput.addEventListener('blur', tryReturningClientLookup);
+ownerPhoneInput.addEventListener('blur', tryReturningClientLookup);
+
 // Base rates, pulled from the Rates & Pricing section
 const RATE_INFO = {
   'Drop-In Visit':             { rate: 16, unit: 'per visit (30 min, under 5 mi — see Rates & Pricing for other options)' },
