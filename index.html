@@ -345,16 +345,16 @@
           <input type="tel" id="vetPhone" name="vetPhone" required />
         </div>
 
-        <h3 class="form-section-title">Pet Profile <span class="field-hint">(optional, for our pet profile sheet)</span></h3>
+        <h3 class="form-section-title">Pet Profile</h3>
         <div class="form-row">
           <div class="form-group">
             <label for="petName">Pet's Name</label>
-            <input type="text" id="petName" name="petName" />
+            <input type="text" id="petName" name="petName" required />
           </div>
           <div class="form-group">
             <label for="petType">Pet Type</label>
-            <select id="petType" name="petType">
-              <option value="" selected>Select type</option>
+            <select id="petType" name="petType" required>
+              <option value="" disabled selected>Select type</option>
               <option value="Dog">Dog</option>
               <option value="Cat">Cat</option>
               <option value="Both">Dog &amp; Cat</option>
@@ -364,41 +364,41 @@
         <div class="form-row">
           <div class="form-group">
             <label for="petBreed">Breed</label>
-            <input type="text" id="petBreed" name="petBreed" />
+            <input type="text" id="petBreed" name="petBreed" required />
           </div>
           <div class="form-group">
             <label for="petAge">Age</label>
-            <input type="text" id="petAge" name="petAge" />
+            <input type="text" id="petAge" name="petAge" required />
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label for="petWeight">Weight</label>
-            <input type="text" id="petWeight" name="petWeight" />
+            <input type="text" id="petWeight" name="petWeight" required />
           </div>
           <div class="form-group">
             <label for="petVaccDate">Date of Last Vaccinations</label>
-            <input type="date" id="petVaccDate" name="petVaccDate" />
+            <input type="date" id="petVaccDate" name="petVaccDate" required />
           </div>
         </div>
         <div class="form-group full">
           <label for="feeding">Feeding Instructions</label>
-          <textarea id="feeding" name="feeding" rows="2"></textarea>
+          <textarea id="feeding" name="feeding" rows="2" required></textarea>
         </div>
         <div class="form-group full">
-          <label for="medications">Medications</label>
-          <textarea id="medications" name="medications" rows="2"></textarea>
+          <label for="medications">Medications <span class="field-hint">(write "None" if not applicable)</span></label>
+          <textarea id="medications" name="medications" rows="2" required></textarea>
         </div>
         <div class="form-group full">
-          <label for="petAllergies">Allergies / Health Concerns</label>
-          <textarea id="petAllergies" name="petAllergies" rows="2"></textarea>
+          <label for="petAllergies">Allergies / Health Concerns <span class="field-hint">(write "None" if not applicable)</span></label>
+          <textarea id="petAllergies" name="petAllergies" rows="2" required></textarea>
         </div>
         <div class="form-group full">
-          <label for="petBehavior">Behavior Notes <span class="field-hint">(shy, anxious, aggressive, etc.)</span></label>
-          <textarea id="petBehavior" name="petBehavior" rows="2"></textarea>
+          <label for="petBehavior">Behavior Notes <span class="field-hint">(shy, anxious, aggressive, etc. — write "None" if not applicable)</span></label>
+          <textarea id="petBehavior" name="petBehavior" rows="2" required></textarea>
         </div>
         <div class="form-group full">
-          <label for="petFavorites">Favorite Toys / Activities</label>
+          <label for="petFavorites">Favorite Toys / Activities <span class="field-hint">(optional)</span></label>
           <input type="text" id="petFavorites" name="petFavorites" />
         </div>
 
