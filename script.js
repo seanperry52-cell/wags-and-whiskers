@@ -600,11 +600,13 @@ function buildContractHtml(d) {
   } else if (isDropIn) {
     const isFar = parseFloat(d.distanceMiles) >= 5;
     const daySpan = (d.endDate && d.endDate !== d.startDate) ? nights + 1 : 1;
-    const extended = daySpan >= 14;
+    const totalVisits = visitCount * daySpan;
+    const extended = totalVisits >= 14;
     const rates = extended ? DROP_IN_EXTENDED_RATES : DROP_IN_RATES;
     rate = (isFar ? rates.far : rates.near) + (isPuppy ? PUPPY_ADDON : 0);
-    unit = `per visit (30 min, ${isFar ? '5+' : 'under 5'} mi from Misti's home${extended ? ', extended rate (14+ day request)' : ''}${isPuppy ? ' + puppy add-on' : ''})`;
-    visitTotal = `$${(rate * visitCount).toFixed(2)}`;
+    unit = `per visit (30 min, ${isFar ? '5+' : 'under 5'} mi from Misti's home${extended ? ', extended rate (14+ visits in this request)' : ''}${isPuppy ? ' + puppy add-on' : ''})`;
+    dailyTotal = daySpan > 1 ? `$${(rate * visitCount).toFixed(2)}` : '';
+    visitTotal = `$${(rate * totalVisits).toFixed(2)}`;
   }
 
   const dateRange = d.clientType === 'Ongoing'
