@@ -277,20 +277,7 @@ const RATE_INFO = {
 };
 
 // ── Distance-based drop-in pricing ──────────────────────────────────────────
-// Misti's home base: 2802 NE 63rd St, Gladstone, MO 64119
-const HOME_LAT = 39.2077088;
-const HOME_LON = -94.5462325;
 const DROP_IN_RATES = { near: 16, far: 18 };
-
-// Driving distance (in miles) from home to the given point, via the public
-// OSRM routing API. Falls back to null if the route can't be computed.
-async function drivingMilesFromHome(lat, lon) {
-  const url = `https://router.project-osrm.org/route/v1/driving/${HOME_LON},${HOME_LAT};${lon},${lat}?overview=false`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data.code !== 'Ok' || !data.routes?.length) return null;
-  return data.routes[0].distance / 1609.34; // meters -> miles
-}
 
 const addressInput = document.getElementById('address');
 const addressDistanceNote = document.getElementById('addressDistanceNote');
@@ -306,21 +293,14 @@ async function updateDistancePricing() {
 
   addressDistanceNote.textContent = 'Checking distance for drop-in pricing…';
   try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${encodeURIComponent(address)}`;
-    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-    const results = await res.json();
-    if (!results.length) {
-      addressDistanceNote.textContent = "Couldn't locate that address — drop-in rate will be confirmed at booking.";
-      distanceMilesInput.value = '';
-      return;
-    }
-    const { lat, lon } = results[0];
-    const miles = await drivingMilesFromHome(Number(lat), Number(lon));
-    if (miles == null) {
+    const res = await fetch(`${BOOKING_API}/api/distance?address=${encodeURIComponent(address)}`);
+    const data = await res.json();
+    if (!res.ok || data.miles == null) {
       addressDistanceNote.textContent = "Couldn't calculate driving distance — drop-in rate will be confirmed at booking.";
       distanceMilesInput.value = '';
       return;
     }
+    const miles = data.miles;
     distanceMilesInput.value = miles.toFixed(2);
 
     const isFar = miles >= 5;
