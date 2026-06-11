@@ -161,6 +161,10 @@ const endTimeGroup = document.getElementById('endTimeGroup');
 const endTimeInput = document.getElementById('endTime');
 const dropinSlotsGroup = document.getElementById('dropinSlotsGroup');
 const dropinSlots = document.getElementById('dropinSlots');
+const endDateInput = document.getElementById('endDate');
+const scheduleFields = document.getElementById('scheduleFields');
+const ongoingScheduleNote = document.getElementById('ongoingScheduleNote');
+const clientTypeRadios = document.querySelectorAll('input[name="clientType"]');
 
 // Drop-off / pick-up time pickers offer the same 7:00 AM – 9:00 PM,
 // 30-minute slot options as the drop-in time picker.
@@ -254,6 +258,27 @@ function updateTimeFields() {
   }
 }
 
+function isOngoingClient() {
+  return [...clientTypeRadios].find(r => r.checked)?.value === 'Ongoing';
+}
+
+function todayISO() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function updateBookingTypeFields() {
+  const ongoing = isOngoingClient();
+  scheduleFields.hidden = ongoing;
+  ongoingScheduleNote.hidden = !ongoing;
+  startDateInput.required = !ongoing;
+  if (ongoing) {
+    selectedSlots.clear();
+  } else {
+    updateTimeFields();
+  }
+}
+
 serviceTypeSelect.addEventListener('change', () => {
   startTimeInput.value = '';
   updateTimeFields();
@@ -266,7 +291,9 @@ startDateInput.addEventListener('change', () => {
     renderTimeSlots();
   }
 });
+clientTypeRadios.forEach(r => r.addEventListener('change', updateBookingTypeFields));
 updateTimeFields();
+updateBookingTypeFields();
 
 // ── Booking form -> email + pre-filled printable contract ──────────────────
 const bookingForm = document.getElementById('bookingForm');
@@ -488,9 +515,11 @@ function buildContractHtml(d) {
     visitTotal = `$${(rate * visitCount).toFixed(2)}`;
   }
 
-  const dateRange = d.endDate && d.endDate !== d.startDate
-    ? `${formatDate(d.startDate)} &ndash; ${formatDate(d.endDate)}`
-    : formatDate(d.startDate);
+  const dateRange = d.clientType === 'Ongoing'
+    ? 'Ongoing &mdash; schedule based on availability'
+    : (d.endDate && d.endDate !== d.startDate
+      ? `${formatDate(d.startDate)} &ndash; ${formatDate(d.endDate)}`
+      : formatDate(d.startDate));
 
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -682,8 +711,13 @@ bookingForm.addEventListener('submit', async (e) => {
 
   const data = new FormData(bookingForm);
   const d = Object.fromEntries(data.entries());
+  const ongoing = d.clientType === 'Ongoing';
 
-  if (DROP_IN_SERVICES.has(d.serviceType)) {
+  if (ongoing) {
+    d.startDate = todayISO();
+    d.endDate = '';
+    d.startTime = '';
+  } else if (DROP_IN_SERVICES.has(d.serviceType)) {
     if (selectedSlots.size === 0) {
       showBookingStatus('Please choose at least one time slot for your visit.', 'error');
       return;
@@ -719,7 +753,8 @@ bookingForm.addEventListener('submit', async (e) => {
     `Email: ${d.ownerEmail}`,
     `Phone: ${d.ownerPhone || 'N/A'}`,
     `Service Type: ${d.serviceType}`,
-    `Start Date: ${d.startDate}`,
+    `Booking Type: ${d.clientType === 'Ongoing' ? 'Ongoing / recurring (schedule based on availability)' : 'One-time'}`,
+    `Start Date: ${d.clientType === 'Ongoing' ? 'N/A — ongoing client' : d.startDate}`,
     `End Date: ${d.endDate || 'N/A'}`,
     `Preferred Time: ${d.startTime || 'N/A'}`,
     `Pet(s) Info: ${d.petInfo}`,
