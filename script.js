@@ -659,15 +659,8 @@ function buildContractHtml(d) {
     <h3 class="sub-h">6. Additional Notes</h3>
     <p>${d.notes || '____________________________________________________________'}</p>
 
-    <h3 class="sub-h">7. Agreement &amp; Signatures</h3>
+    <h3 class="sub-h">7. Agreement</h3>
     <p>Valid until canceled in writing.</p>
-    <div class="sign-block">
-      <div class="field"><label>Owner Signature:</label> <span class="sign-line">&nbsp;</span> &nbsp;&nbsp; <label>Date:</label> ____________________</div>
-    </div>
-    <div class="sign-block">
-      <div class="field">Wags and Whiskers by Misti, LLC, a Missouri limited liability company,</div>
-      <div class="field"><label>By:</label> <span class="sign-line">&nbsp;</span> Misti Anderson, Managing Member &nbsp;&nbsp; <label>Date:</label> ____________________</div>
-    </div>
   </div>
 
   <div class="page">
@@ -688,6 +681,7 @@ function buildContractHtml(d) {
 
     <h3 class="sub-h">Household Info (Drop-Ins Only)</h3>
     <div class="field">Others in home during visits? ${checkbox(!!d.othersHome)} Yes &nbsp; ${checkbox(!d.othersHome)} No &nbsp; If yes: ${d.othersHome || blankLine}</div>
+    <div class="field">Access Type: ${checkbox(d.accessType === 'Key')} Key &nbsp; ${checkbox(d.accessType === 'Code')} Code &nbsp; ${checkbox(d.accessType === 'Other')} Other</div>
     <div class="field">Access Instructions: ${d.accessInstructions || blankLine}</div>
     <div class="field">Key Return: ${checkbox(d.keyReturn === 'After Final Visit')} After Final Visit &nbsp; ${checkbox(d.keyReturn === 'Retained')} Sitter Keeps a Copy &nbsp; ${checkbox(!d.keyReturn)} N/A</div>
     <div class="field">Restricted areas? ${checkbox(!!d.restrictedAreas)} Yes &nbsp; ${checkbox(!d.restrictedAreas)} No &nbsp; If yes: ${d.restrictedAreas || blankLine}</div>
