@@ -671,6 +671,28 @@ a { color: inherit; text-decoration: none; }
 
 .form-group.full { grid-column: 1 / -1; }
 
+.radio-row {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 500;
+  font-size: 0.95rem;
+  color: var(--brown);
+  cursor: pointer;
+}
+
+.radio-option input[type="radio"] {
+  width: auto;
+  margin: 0;
+}
+
 /* .form-group sets display:flex at the same specificity as the UA [hidden]
    rule, which would otherwise win and keep hidden groups visible. */
 .form-group[hidden] { display: none; }

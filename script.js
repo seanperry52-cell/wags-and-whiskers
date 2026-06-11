@@ -257,6 +257,7 @@ function updateTimeFields() {
 serviceTypeSelect.addEventListener('change', () => {
   startTimeInput.value = '';
   updateTimeFields();
+  updateDistancePricing();
 });
 startDateInput.addEventListener('change', () => {
   startTimeInput.value = '';
@@ -289,6 +290,14 @@ let addressOutOfRange = false;
 async function updateDistancePricing() {
   const address = addressInput.value.trim();
   addressOutOfRange = false;
+  addressDistanceNote.classList.remove('distance-out-of-range');
+
+  if (!DROP_IN_SERVICES.has(serviceTypeSelect.value)) {
+    addressDistanceNote.textContent = '';
+    distanceMilesInput.value = '';
+    return;
+  }
+
   if (!address) {
     addressDistanceNote.textContent = '';
     distanceMilesInput.value = '';
@@ -310,11 +319,10 @@ async function updateDistancePricing() {
     if (miles > MAX_SERVICE_MILES) {
       addressOutOfRange = true;
       addressDistanceNote.textContent =
-        `This address is approx. ${miles.toFixed(1)} mi from Misti's home, which is outside our ${MAX_SERVICE_MILES}-mile service area. Please contact us directly to discuss options.`;
+        `This address is approx. ${miles.toFixed(1)} mi from Misti's home, which is outside our ${MAX_SERVICE_MILES}-mile service area for drop-in visits. Please contact us directly to discuss options.`;
       addressDistanceNote.classList.add('distance-out-of-range');
       return;
     }
-    addressDistanceNote.classList.remove('distance-out-of-range');
 
     const isFar = miles >= 5;
     const rate = isFar ? DROP_IN_RATES.far : DROP_IN_RATES.near;
