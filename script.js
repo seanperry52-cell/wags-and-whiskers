@@ -276,6 +276,64 @@ const RATE_INFO = {
   'Overnight Stay':            { rate: 45, unit: 'per night' },
 };
 
+// ── Distance-based drop-in pricing ──────────────────────────────────────────
+// Misti's home base: 2802 NE 63rd St, Gladstone, MO 64119
+const HOME_LAT = 39.2077088;
+const HOME_LON = -94.5462325;
+const DROP_IN_RATES = { near: 16, far: 18 };
+
+function milesBetween(lat1, lon1, lat2, lon2) {
+  const R = 3958.8; // Earth radius in miles
+  const toRad = deg => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+const addressInput = document.getElementById('address');
+const addressDistanceNote = document.getElementById('addressDistanceNote');
+const distanceMilesInput = document.getElementById('distanceMiles');
+
+async function updateDistancePricing() {
+  const address = addressInput.value.trim();
+  if (!address) {
+    addressDistanceNote.textContent = '';
+    distanceMilesInput.value = '';
+    return;
+  }
+
+  addressDistanceNote.textContent = 'Checking distance for drop-in pricing…';
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${encodeURIComponent(address)}`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    const results = await res.json();
+    if (!results.length) {
+      addressDistanceNote.textContent = "Couldn't locate that address — drop-in rate will be confirmed at booking.";
+      distanceMilesInput.value = '';
+      return;
+    }
+    const { lat, lon } = results[0];
+    const miles = milesBetween(HOME_LAT, HOME_LON, Number(lat), Number(lon));
+    distanceMilesInput.value = miles.toFixed(2);
+
+    const isFar = miles >= 5;
+    const rate = isFar ? DROP_IN_RATES.far : DROP_IN_RATES.near;
+    RATE_INFO['Drop-In Visit'] = {
+      rate,
+      unit: `per visit (30 min, ${isFar ? '5+' : 'under 5'} mi from Misti's home)`,
+    };
+    addressDistanceNote.textContent =
+      `Approx. ${miles.toFixed(1)} mi from Misti's home — Drop-In rate: $${rate}/visit (30 min)`;
+  } catch {
+    addressDistanceNote.textContent = '';
+    distanceMilesInput.value = '';
+  }
+}
+
+addressInput.addEventListener('blur', updateDistancePricing);
+
 function formatDate(value) {
   if (!value) return '____________________';
   const [y, m, d] = value.split('-').map(Number);
