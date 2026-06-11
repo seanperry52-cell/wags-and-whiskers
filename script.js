@@ -278,13 +278,17 @@ const RATE_INFO = {
 
 // ── Distance-based drop-in pricing ──────────────────────────────────────────
 const DROP_IN_RATES = { near: 16, far: 18 };
+const MAX_SERVICE_MILES = 10;
 
 const addressInput = document.getElementById('address');
 const addressDistanceNote = document.getElementById('addressDistanceNote');
 const distanceMilesInput = document.getElementById('distanceMiles');
 
+let addressOutOfRange = false;
+
 async function updateDistancePricing() {
   const address = addressInput.value.trim();
+  addressOutOfRange = false;
   if (!address) {
     addressDistanceNote.textContent = '';
     distanceMilesInput.value = '';
@@ -302,6 +306,15 @@ async function updateDistancePricing() {
     }
     const miles = data.miles;
     distanceMilesInput.value = miles.toFixed(2);
+
+    if (miles > MAX_SERVICE_MILES) {
+      addressOutOfRange = true;
+      addressDistanceNote.textContent =
+        `This address is approx. ${miles.toFixed(1)} mi from Misti's home, which is outside our ${MAX_SERVICE_MILES}-mile service area. Please contact us directly to discuss options.`;
+      addressDistanceNote.classList.add('distance-out-of-range');
+      return;
+    }
+    addressDistanceNote.classList.remove('distance-out-of-range');
 
     const isFar = miles >= 5;
     const rate = isFar ? DROP_IN_RATES.far : DROP_IN_RATES.near;
@@ -653,6 +666,11 @@ function showBookingStatus(message, type) {
 bookingForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   bookingStatus.hidden = true;
+
+  if (addressOutOfRange) {
+    showBookingStatus(`Sorry, your address is outside our ${MAX_SERVICE_MILES}-mile service area. Please contact us directly to discuss options.`, 'error');
+    return;
+  }
 
   const data = new FormData(bookingForm);
   const d = Object.fromEntries(data.entries());

@@ -592,6 +592,10 @@ a { color: inherit; text-decoration: none; }
   color: var(--brown-light);
 }
 
+.field-hint.distance-out-of-range {
+  color: #b3261e;
+}
+
 /* ── DROP-IN / WALK TIME SLOTS ── */
 .dropin-slots {
   display: grid;
