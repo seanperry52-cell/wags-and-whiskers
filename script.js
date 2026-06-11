@@ -353,7 +353,36 @@ const RATE_INFO = {
 
 // ── Distance-based drop-in pricing ──────────────────────────────────────────
 const DROP_IN_RATES = { near: 16, far: 18 };
+const DROP_IN_EXTENDED_RATES = { near: 15, far: 17 }; // 14+ visits / ongoing recurring clients
+const PUPPY_ADDON = 4; // drop-in puppy add-on
+const OVERNIGHT_PUPPY_RATE = 50;
+const OVERNIGHT_OVER_24H_FEE = 20;
 const MAX_SERVICE_MILES = 10;
+
+// Pet Profile "Age" is free text (e.g. "8 weeks", "5 months", "2", "3 years") —
+// treat anything under 1 year old as a puppy/kitten for pricing.
+function isPuppyAge(ageText) {
+  const text = String(ageText || '').toLowerCase().trim();
+  if (!text) return false;
+  if (text.includes('puppy') || text.includes('kitten')) return true;
+  const match = text.match(/(\d+(?:\.\d+)?)/);
+  if (!match) return false;
+  const num = parseFloat(match[1]);
+  if (text.includes('week')) return true;
+  if (text.includes('month')) return num < 12;
+  return num < 1; // bare number or "years"/"yr" — assume years
+}
+
+// Overnight stays beyond full 24-hour blocks (drop-off time earlier in the
+// day than pick-up time) incur a flat over-24-hour fee.
+function overnightExtraHours(d, nights) {
+  if (!d.startTime || !d.endTime || !d.startDate || !d.endDate) return 0;
+  const start = new Date(`${d.startDate}T${d.startTime}:00`);
+  const end = new Date(`${d.endDate}T${d.endTime}:00`);
+  const totalHours = (end - start) / 3600000;
+  const extra = totalHours - nights * 24;
+  return extra > 0.01 ? extra : 0;
+}
 
 const addressInput = document.getElementById('address');
 const addressDistanceNote = document.getElementById('addressDistanceNote');
@@ -549,16 +578,31 @@ function buildContractHtml(d) {
   const visitCount = isDropIn ? Math.max(dropInTimes.length, 1) : 1;
 
   const nights = nightsBetween(d.startDate, d.endDate);
+  const isPuppy = isPuppyAge(d.petAge);
   let rate = RATE_INFO[serviceType]?.rate ?? 0;
   let unit = RATE_INFO[serviceType]?.unit ?? '';
   let dailyTotal = '';
   let visitTotal = '';
+  let visitTotalNote = '';
 
   if (isOvernight) {
-    if (nights >= 10) rate = 40;
+    if (nights >= 10) {
+      rate = 40;
+      unit = 'per night (extended rate, 10+ nights)';
+    } else if (isPuppy) {
+      rate = OVERNIGHT_PUPPY_RATE;
+      unit = 'per night (puppy)';
+    }
+    const over24Fee = overnightExtraHours(d, nights) > 0 ? OVERNIGHT_OVER_24H_FEE : 0;
     dailyTotal = `$${rate.toFixed(2)}`;
-    visitTotal = `$${(rate * nights).toFixed(2)}`;
+    visitTotal = `$${(rate * nights + over24Fee).toFixed(2)}`;
+    if (over24Fee) visitTotalNote = ` (incl. $${over24Fee.toFixed(2)} over-24-hour fee)`;
   } else if (isDropIn) {
+    const isFar = parseFloat(d.distanceMiles) >= 5;
+    const extended = d.clientType === 'Ongoing';
+    const rates = extended ? DROP_IN_EXTENDED_RATES : DROP_IN_RATES;
+    rate = (isFar ? rates.far : rates.near) + (isPuppy ? PUPPY_ADDON : 0);
+    unit = `per visit (30 min, ${isFar ? '5+' : 'under 5'} mi from Misti's home${extended ? ', extended/recurring rate' : ''}${isPuppy ? ' + puppy add-on' : ''})`;
     visitTotal = `$${(rate * visitCount).toFixed(2)}`;
   }
 
@@ -645,7 +689,7 @@ function buildContractHtml(d) {
     <h3 class="sub-h">3. Payment</h3>
     <p>Due at end of visit or at last drop-in. Check or cash payment will be left at residence for drop-ins and held until the last drop-in.</p>
     <div class="field"><label>Rate per (visit/day):</label> $${rate.toFixed(2)} ${unit}</div>
-    <div class="field"><label>Daily Total:</label> ${dailyTotal || '$__________'} &nbsp;&nbsp; <label>Visit Total:</label> ${visitTotal || '$__________'}</div>
+    <div class="field"><label>Daily Total:</label> ${dailyTotal || '$__________'} &nbsp;&nbsp; <label>Visit Total:</label> ${visitTotal || '$__________'}${visitTotalNote}</div>
     <div class="field"><label>Payment Due:</label> ☐ ____________ (date) &nbsp; ☑ At time of visit &nbsp; ☐ Weekly &nbsp; ☐ Biweekly &nbsp; ☐ Monthly</div>
     <div class="field"><label>Late Payment Fee:</label> $______ after ______ days</div>
     <div class="field"><label>Payment Methods:</label> Cash, Venmo, Cash App, Check</div>
