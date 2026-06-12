@@ -94,9 +94,9 @@
   <!-- ABOUT -->
   <section id="about" class="section about">
     <div class="section-inner">
-      <h2 class="section-title reveal">About Us &amp; Our Services</h2>
       <div class="about-services-grid">
         <div class="about-col">
+          <h2 class="section-title about-title reveal">About Us &amp; Our Services</h2>
           <div class="about-card reveal" data-rotate="left">
             <h3>Welcome!</h3>
             <p>
@@ -122,35 +122,100 @@
           </p>
         </div>
 
-        <div class="services-col" id="services">
-          <div class="card-grid services-grid-compact">
-            <div class="tilt-card reveal" data-rotate="right">
-              <div class="tilt-inner">
-                <div class="card-icon">🏠</div>
-                <h3>Drop-In Visits</h3>
-                <p>Quick, loving check-ins for feeding, potty breaks, playtime, and fresh water — perfect for busy days.</p>
+        <div class="photos-col">
+          <h3 class="subsection-title reveal">Happy Clients</h3>
+          <div class="reviews-carousel">
+            <button type="button" class="cal-nav photos-prev" aria-label="Previous photos">‹</button>
+            <div class="review-stack" id="photosTrack">
+              <div class="review-card photo-card">
+                <div class="review-card-inner">
+                  <div class="review-card-front photo-placeholder">
+                    <span class="photo-icon">🐾</span>
+                    <span class="review-flip-hint">Tap for details</span>
+                  </div>
+                  <div class="review-card-back">
+                    <p>Client pet photos will appear here soon!</p>
+                  </div>
+                </div>
+              </div>
+              <div class="review-card photo-card">
+                <div class="review-card-inner">
+                  <div class="review-card-front photo-placeholder">
+                    <span class="photo-icon">🐶</span>
+                    <span class="review-flip-hint">Tap for details</span>
+                  </div>
+                  <div class="review-card-back">
+                    <p>Client pet photos will appear here soon!</p>
+                  </div>
+                </div>
+              </div>
+              <div class="review-card photo-card">
+                <div class="review-card-inner">
+                  <div class="review-card-front photo-placeholder">
+                    <span class="photo-icon">🐱</span>
+                    <span class="review-flip-hint">Tap for details</span>
+                  </div>
+                  <div class="review-card-back">
+                    <p>Client pet photos will appear here soon!</p>
+                  </div>
+                </div>
+              </div>
+              <div class="review-card photo-card">
+                <div class="review-card-inner">
+                  <div class="review-card-front photo-placeholder">
+                    <span class="photo-icon">🐾</span>
+                    <span class="review-flip-hint">Tap for details</span>
+                  </div>
+                  <div class="review-card-back">
+                    <p>Client pet photos will appear here soon!</p>
+                  </div>
+                </div>
+              </div>
+              <div class="review-card photo-card">
+                <div class="review-card-inner">
+                  <div class="review-card-front photo-placeholder">
+                    <span class="photo-icon">🐶</span>
+                    <span class="review-flip-hint">Tap for details</span>
+                  </div>
+                  <div class="review-card-back">
+                    <p>Client pet photos will appear here soon!</p>
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="tilt-card reveal" data-rotate="right">
-              <div class="tilt-inner">
-                <div class="card-icon">🌙</div>
-                <h3>Overnight Stays</h3>
-                <p>Round-the-clock care and companionship for your pet at Misti's home — a safe, loving home-away-from-home while you're away. To keep things calm and comfortable, pets from separate households are never boarded together.</p>
-              </div>
+            <button type="button" class="cal-nav photos-next" aria-label="Next photos">›</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="services-col" id="services">
+        <div class="card-grid services-grid-compact">
+          <div class="tilt-card reveal" data-rotate="right">
+            <div class="tilt-inner">
+              <div class="card-icon">🏠</div>
+              <h3>Drop-In Visits</h3>
+              <p>Quick, loving check-ins for feeding, potty breaks, playtime, and fresh water — perfect for busy days.</p>
             </div>
-            <div class="tilt-card reveal" data-rotate="right">
-              <div class="tilt-inner">
-                <div class="card-icon">🐕</div>
-                <h3>Dog Walking</h3>
-                <p>Daily walks to keep tails wagging, energy balanced, and your pup happy and healthy.</p>
-              </div>
+          </div>
+          <div class="tilt-card reveal" data-rotate="right">
+            <div class="tilt-inner">
+              <div class="card-icon">🌙</div>
+              <h3>Overnight Stays</h3>
+              <p>Round-the-clock care and companionship for your pet at Misti's home — a safe, loving home-away-from-home while you're away. To keep things calm and comfortable, pets from separate households are never boarded together.</p>
             </div>
-            <div class="tilt-card reveal" data-rotate="right">
-              <div class="tilt-inner">
-                <div class="card-icon">💊</div>
-                <h3>Medication &amp; Special Care</h3>
-                <p>Experienced with administering medications — including injectables — for pets of any age.</p>
-              </div>
+          </div>
+          <div class="tilt-card reveal" data-rotate="right">
+            <div class="tilt-inner">
+              <div class="card-icon">🐕</div>
+              <h3>Dog Walking</h3>
+              <p>Daily walks to keep tails wagging, energy balanced, and your pup happy and healthy.</p>
+            </div>
+          </div>
+          <div class="tilt-card reveal" data-rotate="right">
+            <div class="tilt-inner">
+              <div class="card-icon">💊</div>
+              <h3>Medication &amp; Special Care</h3>
+              <p>Experienced with administering medications — including injectables — for pets of any age.</p>
             </div>
           </div>
         </div>
@@ -206,8 +271,7 @@
         <p>100% Recommend &middot; 5 Reviews on Facebook</p>
       </div>
 
-      <div class="reviews-photos-grid">
-        <div class="reviews-col">
+      <div class="reviews-col">
           <h3 class="subsection-title reveal">Reviews</h3>
           <div class="reviews-carousel">
             <button type="button" class="cal-nav reviews-prev" aria-label="Previous reviews">‹</button>
@@ -280,72 +344,6 @@
             </div>
             <button type="button" class="cal-nav reviews-next" aria-label="Next reviews">›</button>
           </div>
-        </div>
-
-        <div class="photos-col">
-          <h3 class="subsection-title reveal">Happy Clients</h3>
-          <div class="reviews-carousel">
-            <button type="button" class="cal-nav photos-prev" aria-label="Previous photos">‹</button>
-            <div class="review-stack" id="photosTrack">
-              <div class="review-card photo-card">
-                <div class="review-card-inner">
-                  <div class="review-card-front photo-placeholder">
-                    <span class="photo-icon">🐾</span>
-                    <span class="review-flip-hint">Tap for details</span>
-                  </div>
-                  <div class="review-card-back">
-                    <p>Client pet photos will appear here soon!</p>
-                  </div>
-                </div>
-              </div>
-              <div class="review-card photo-card">
-                <div class="review-card-inner">
-                  <div class="review-card-front photo-placeholder">
-                    <span class="photo-icon">🐶</span>
-                    <span class="review-flip-hint">Tap for details</span>
-                  </div>
-                  <div class="review-card-back">
-                    <p>Client pet photos will appear here soon!</p>
-                  </div>
-                </div>
-              </div>
-              <div class="review-card photo-card">
-                <div class="review-card-inner">
-                  <div class="review-card-front photo-placeholder">
-                    <span class="photo-icon">🐱</span>
-                    <span class="review-flip-hint">Tap for details</span>
-                  </div>
-                  <div class="review-card-back">
-                    <p>Client pet photos will appear here soon!</p>
-                  </div>
-                </div>
-              </div>
-              <div class="review-card photo-card">
-                <div class="review-card-inner">
-                  <div class="review-card-front photo-placeholder">
-                    <span class="photo-icon">🐾</span>
-                    <span class="review-flip-hint">Tap for details</span>
-                  </div>
-                  <div class="review-card-back">
-                    <p>Client pet photos will appear here soon!</p>
-                  </div>
-                </div>
-              </div>
-              <div class="review-card photo-card">
-                <div class="review-card-inner">
-                  <div class="review-card-front photo-placeholder">
-                    <span class="photo-icon">🐶</span>
-                    <span class="review-flip-hint">Tap for details</span>
-                  </div>
-                  <div class="review-card-back">
-                    <p>Client pet photos will appear here soon!</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <button type="button" class="cal-nav photos-next" aria-label="Next photos">›</button>
-          </div>
-        </div>
       </div>
     </div>
   </section>

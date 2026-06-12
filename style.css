@@ -274,10 +274,20 @@ a { color: inherit; text-decoration: none; }
   align-items: start;
 }
 
+.about-title {
+  text-align: left;
+  margin-bottom: 1rem;
+}
+
 .about-col {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+.photos-col {
+  display: flex;
+  flex-direction: column;
 }
 
 .about-card {
@@ -303,11 +313,12 @@ a { color: inherit; text-decoration: none; }
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  margin-top: 2.5rem;
 }
 
 .services-grid-compact {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 1.2rem;
   margin-bottom: 0;
 }
@@ -453,12 +464,6 @@ a { color: inherit; text-decoration: none; }
   font-weight: 700;
   margin-top: 0.4rem;
   color: var(--brown-light);
-}
-
-.reviews-photos-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2.5rem;
 }
 
 .subsection-title {
@@ -1032,7 +1037,6 @@ input:focus, select:focus, textarea:focus {
   .form-row { grid-template-columns: 1fr; }
   .signin-form { flex-wrap: wrap; }
   .signin-form input { width: 100%; }
-  .reviews-photos-grid { grid-template-columns: 1fr; gap: 2rem; }
   .rates-grid { grid-template-columns: 1fr; }
 }
 
