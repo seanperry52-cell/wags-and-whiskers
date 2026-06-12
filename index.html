@@ -246,22 +246,72 @@
     <div class="modal-box booking-modal-box">
       <button type="button" class="modal-close" id="bookingModalClose" aria-label="Close">&times;</button>
 
-      <div class="calendar-card">
-        <div class="calendar-header">
-          <button type="button" id="calPrev" class="cal-nav" aria-label="Previous month">‹</button>
-          <h3 id="calMonthLabel"></h3>
-          <button type="button" id="calNext" class="cal-nav" aria-label="Next month">›</button>
-        </div>
-        <div id="availabilityCalendar" class="calendar-grid"></div>
-        <div class="calendar-legend">
-          <span><i class="dot dot-available"></i> Available</span>
-          <span><i class="dot dot-booked"></i> Booked (overnight/day care)</span>
-          <span><i class="dot dot-unavailable"></i> Unavailable</span>
-        </div>
-        <p class="calendar-note">Drop-in visits and walks don't take a full day — pick your date and service below to see open time slots.</p>
-      </div>
-
       <form id="bookingForm" class="booking-form">
+        <div class="booking-top-row">
+          <div class="calendar-card">
+            <div class="calendar-header">
+              <button type="button" id="calPrev" class="cal-nav" aria-label="Previous month">‹</button>
+              <h3 id="calMonthLabel"></h3>
+              <button type="button" id="calNext" class="cal-nav" aria-label="Next month">›</button>
+            </div>
+            <div id="availabilityCalendar" class="calendar-grid"></div>
+            <div class="calendar-legend">
+              <span><i class="dot dot-available"></i> Available</span>
+              <span><i class="dot dot-booked"></i> Booked (overnight/day care)</span>
+              <span><i class="dot dot-unavailable"></i> Unavailable</span>
+            </div>
+            <p class="calendar-note">Drop-in visits and walks don't take a full day — pick your date and service below to see open time slots.</p>
+          </div>
+
+          <div class="schedule-card">
+            <div class="form-group full">
+              <label>Booking Type</label>
+              <div class="radio-row">
+                <label class="radio-option">
+                  <input type="radio" name="clientType" value="One-Time" checked />
+                  One-time booking
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="clientType" value="Ongoing" />
+                  Ongoing / recurring client
+                </label>
+              </div>
+              <span class="field-hint">Let us know if you'd like to set up a regular recurring schedule — extended/recurring rates may apply (see Rates &amp; Pricing).</span>
+            </div>
+
+            <p id="ongoingScheduleNote" class="field-hint" hidden>As an ongoing/recurring client, no fixed start/end dates or times are needed here — we'll reach out to coordinate a recurring schedule based on availability.</p>
+
+            <div id="scheduleFields">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="startDate">Start Date</label>
+                  <input type="date" id="startDate" name="startDate" required />
+                </div>
+                <div class="form-group">
+                  <label for="endDate">End Date</label>
+                  <input type="date" id="endDate" name="endDate" />
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group" id="startTimeGroup">
+                  <label for="startTime" id="startTimeLabel">Preferred Time</label>
+                  <select id="startTime" name="startTime"></select>
+                </div>
+                <div class="form-group" id="endTimeGroup" hidden>
+                  <label for="endTime">Pick-up Time</label>
+                  <select id="endTime" name="endTime"></select>
+                </div>
+              </div>
+
+              <div class="form-group full" id="dropinSlotsGroup" hidden>
+                <label>Available Times <span class="field-hint">(select one or more)</span></label>
+                <div id="dropinSlots" class="dropin-slots"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="booking-tabs">
           <button type="button" class="booking-tab active" data-booking-tab="details">Your Info &amp; Schedule</button>
           <button type="button" class="booking-tab" data-booking-tab="petinfo">Pet Info</button>
@@ -302,51 +352,6 @@
           </div>
         </div>
 
-        <div class="form-group full">
-          <label>Booking Type</label>
-          <div class="radio-row">
-            <label class="radio-option">
-              <input type="radio" name="clientType" value="One-Time" checked />
-              One-time booking
-            </label>
-            <label class="radio-option">
-              <input type="radio" name="clientType" value="Ongoing" />
-              Ongoing / recurring client
-            </label>
-          </div>
-          <span class="field-hint">Let us know if you'd like to set up a regular recurring schedule — extended/recurring rates may apply (see Rates &amp; Pricing).</span>
-        </div>
-
-        <p id="ongoingScheduleNote" class="field-hint" hidden>As an ongoing/recurring client, no fixed start/end dates or times are needed here — we'll reach out to coordinate a recurring schedule based on availability.</p>
-
-        <div id="scheduleFields">
-          <div class="form-row">
-            <div class="form-group">
-              <label for="startDate">Start Date</label>
-              <input type="date" id="startDate" name="startDate" required />
-            </div>
-            <div class="form-group">
-              <label for="endDate">End Date</label>
-              <input type="date" id="endDate" name="endDate" />
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group" id="startTimeGroup">
-              <label for="startTime" id="startTimeLabel">Preferred Time</label>
-              <select id="startTime" name="startTime"></select>
-            </div>
-            <div class="form-group" id="endTimeGroup" hidden>
-              <label for="endTime">Pick-up Time</label>
-              <select id="endTime" name="endTime"></select>
-            </div>
-          </div>
-
-          <div class="form-group full" id="dropinSlotsGroup" hidden>
-            <label>Available Times <span class="field-hint">(select one or more)</span></label>
-            <div id="dropinSlots" class="dropin-slots"></div>
-          </div>
-        </div>
         <div class="booking-tab-nav">
           <span></span>
           <button type="button" class="btn btn-outline booking-next">Next →</button>

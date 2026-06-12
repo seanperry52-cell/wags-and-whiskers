@@ -519,8 +519,38 @@ a { color: inherit; text-decoration: none; }
   border-radius: var(--radius);
   padding: 2.5rem;
   box-shadow: var(--shadow);
-  max-width: 700px;
+  max-width: 900px;
   margin: 0 auto;
+}
+
+.booking-modal-box {
+  max-width: 980px;
+}
+
+.booking-top-row {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  margin-bottom: 2.5rem;
+  flex-wrap: wrap;
+}
+
+.booking-top-row .calendar-card {
+  flex: 1 1 360px;
+  margin: 0;
+  max-width: none;
+}
+
+.schedule-card {
+  flex: 1 1 300px;
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 1.8rem;
+  box-shadow: var(--shadow);
+}
+
+@media (max-width: 800px) {
+  .booking-top-row { flex-direction: column; }
 }
 
 /* ── AVAILABILITY CALENDAR ── */
