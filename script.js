@@ -1009,7 +1009,11 @@ document.querySelectorAll('.booking-next').forEach(btn => {
   btn.addEventListener('click', () => {
     const current = document.querySelector('.booking-tab.active').dataset.bookingTab;
     const next = bookingTabOrder[bookingTabOrder.indexOf(current) + 1];
-    if (next) showBookingTab(next);
+    if (next) {
+      showBookingTab(next);
+      const modalBox = document.querySelector('#bookingModal .modal-box');
+      if (modalBox) modalBox.scrollTop = 0;
+    }
   });
 });
 
