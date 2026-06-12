@@ -1241,15 +1241,20 @@ function renderOverviewBody() {
       }
     }
     contentHtml += '</div>';
-    if (!isEditingProfile) contentHtml += renderPhotosHtml();
   } else if (isEditingProfile && !isLockedSection) {
     contentHtml = `<div class="portal-section"><h4>${activeKey}</h4>${renderSectionEditFields(activeKey, sections[activeKey])}</div>`;
+    if (isPetProfileSection(activeKey)) contentHtml += renderPhotosHtml();
   } else {
     contentHtml = `<div class="portal-section"><h4>${activeKey}</h4>${renderSectionValue(sections[activeKey])}</div>`;
+    if (isPetProfileSection(activeKey)) contentHtml += renderPhotosHtml();
   }
 
   portalOverviewBody.innerHTML = tabsHtml + contentHtml;
   editProfileBtn.hidden = isEditingProfile || isLockedSection;
+}
+
+function isPetProfileSection(sectionTitle) {
+  return /dog profile|pet profile|cat profile/i.test(sectionTitle);
 }
 
 function renderPhotosHtml() {
