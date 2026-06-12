@@ -703,6 +703,24 @@ a { color: inherit; text-decoration: none; }
   border-color: var(--rust);
 }
 
+.booking-tabs-viewport {
+  overflow: hidden;
+  position: relative;
+}
+
+.booking-tabs-track {
+  display: flex;
+  align-items: flex-start;
+  transition: transform 0.4s ease;
+}
+
+.booking-tab-content {
+  flex: 0 0 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding-right: 4px;
+}
+
 .booking-tab-nav {
   display: flex;
   justify-content: space-between;

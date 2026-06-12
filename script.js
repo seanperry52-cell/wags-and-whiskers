@@ -982,19 +982,21 @@ for (const id of ['heroBookBtn', 'navBookBtn']) {
 // ── Booking form tabs ───────────────────────────────────────────────────────
 const bookingTabs = document.querySelectorAll('.booking-tab');
 const bookingTabContents = document.querySelectorAll('.booking-tab-content');
+const bookingTabsTrack = document.querySelector('.booking-tabs-track');
+const bookingTabOrder = ['details', 'emergency', 'pets', 'access'];
 
 function showBookingTab(name) {
+  const index = bookingTabOrder.indexOf(name);
   bookingTabs.forEach(tab => tab.classList.toggle('active', tab.dataset.bookingTab === name));
   bookingTabContents.forEach(content => {
-    content.hidden = content.dataset.bookingTabContent !== name;
+    content.toggleAttribute('inert', content.dataset.bookingTabContent !== name);
   });
+  bookingTabsTrack.style.transform = `translateX(-${index * 100}%)`;
 }
 
 bookingTabs.forEach(tab => {
   tab.addEventListener('click', () => showBookingTab(tab.dataset.bookingTab));
 });
-
-const bookingTabOrder = ['details', 'emergency', 'pets', 'access'];
 
 document.querySelectorAll('.booking-next').forEach(btn => {
   btn.addEventListener('click', () => {
