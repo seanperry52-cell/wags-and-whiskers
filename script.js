@@ -371,7 +371,6 @@ async function tryReturningClientLookup() {
       if (el && !el.value && value) el.value = value;
     };
 
-    fillIfEmpty(document.getElementById('petInfo'), data.petInfo);
     fillIfEmpty(addressInput, data.address);
     for (const [key, value] of Object.entries(data.fields || {})) {
       const el = bookingForm.elements[key];
@@ -869,6 +868,15 @@ bookingForm.addEventListener('submit', async (e) => {
 
   const additionalPets = collectAdditionalPets();
   if (additionalPets.length) d.pets = JSON.stringify(additionalPets);
+
+  // petInfo is no longer a separate field — build it from the pet profile(s).
+  const petSummary = (name, type, breed, age) =>
+    [name, type, breed, age].filter(Boolean).join(', ');
+  const petSummaries = [petSummary(d.petName, d.petType, d.petBreed, d.petAge)];
+  for (const pet of additionalPets) {
+    petSummaries.push(petSummary(pet.petName, pet.petType, pet.petBreed, pet.petAge));
+  }
+  d.petInfo = petSummaries.filter(Boolean).join('; ');
   // Drop the raw per-pet field copies (petName_2, petType_2, ...) — they're
   // already captured in d.pets above.
   for (const key of Object.keys(d)) {
