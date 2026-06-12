@@ -955,6 +955,7 @@ const bookingModalClose = document.getElementById('bookingModalClose');
 function openBookingModal() {
   bookingModal.hidden = false;
   document.body.style.overflow = 'hidden';
+  showBookingTab('details');
 }
 
 function closeBookingModal() {
@@ -977,6 +978,40 @@ for (const id of ['heroBookBtn', 'navBookBtn']) {
     });
   }
 }
+
+// ── Booking form tabs ───────────────────────────────────────────────────────
+const bookingTabs = document.querySelectorAll('.booking-tab');
+const bookingTabContents = document.querySelectorAll('.booking-tab-content');
+
+function showBookingTab(name) {
+  bookingTabs.forEach(tab => tab.classList.toggle('active', tab.dataset.bookingTab === name));
+  bookingTabContents.forEach(content => {
+    content.hidden = content.dataset.bookingTabContent !== name;
+  });
+  bookingModal.querySelector('.modal-box').scrollTop = 0;
+}
+
+bookingTabs.forEach(tab => {
+  tab.addEventListener('click', () => showBookingTab(tab.dataset.bookingTab));
+});
+
+const bookingTabOrder = ['details', 'emergency', 'pets', 'access'];
+
+document.querySelectorAll('.booking-next').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const current = document.querySelector('.booking-tab.active').dataset.bookingTab;
+    const next = bookingTabOrder[bookingTabOrder.indexOf(current) + 1];
+    if (next) showBookingTab(next);
+  });
+});
+
+document.querySelectorAll('.booking-prev').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const current = document.querySelector('.booking-tab.active').dataset.bookingTab;
+    const prev = bookingTabOrder[bookingTabOrder.indexOf(current) - 1];
+    if (prev) showBookingTab(prev);
+  });
+});
 
 // ── Rates modal ──────────────────────────────────────────────────────────────
 const ratesModal = document.getElementById('ratesModal');

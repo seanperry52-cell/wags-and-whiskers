@@ -57,6 +57,18 @@
     </div>
   </div>
 
+  <!-- TOP BAR -->
+  <div id="topBar" class="top-bar">
+    <div class="nav-signin-item">
+      <form id="signInForm" class="signin-form" autocomplete="on">
+        <input type="email" id="signInEmail" placeholder="Email" required autocomplete="email" />
+        <input type="tel" id="signInPhone" placeholder="Phone" required autocomplete="tel" />
+        <button type="submit" class="btn btn-outline signin-btn">Sign In</button>
+      </form>
+      <p id="signInStatus" class="signin-status" hidden></p>
+    </div>
+  </div>
+
   <!-- HERO -->
   <header id="home" class="hero">
     <div class="hero-paws" aria-hidden="true">
@@ -76,14 +88,6 @@
         <li><a href="#services">Services</a></li>
         <li><a href="#" id="ratesNavBtn">Rates</a></li>
         <li><a href="#reviews">Reviews</a></li>
-        <li class="nav-signin-item">
-          <form id="signInForm" class="signin-form" autocomplete="on">
-            <input type="email" id="signInEmail" placeholder="Email" required autocomplete="email" />
-            <input type="tel" id="signInPhone" placeholder="Phone" required autocomplete="tel" />
-            <button type="submit" class="btn btn-outline signin-btn">Sign In</button>
-          </form>
-          <p id="signInStatus" class="signin-status" hidden></p>
-        </li>
         <li><a href="#" class="nav-cta" id="navBookBtn">Book Now</a></li>
       </ul>
     </div>
@@ -260,6 +264,14 @@
       </div>
 
       <form id="bookingForm" class="booking-form">
+        <div class="booking-tabs">
+          <button type="button" class="booking-tab active" data-booking-tab="details">Your Info &amp; Schedule</button>
+          <button type="button" class="booking-tab" data-booking-tab="emergency">Emergency &amp; Vet</button>
+          <button type="button" class="booking-tab" data-booking-tab="pets">Pet Profile</button>
+          <button type="button" class="booking-tab" data-booking-tab="access">Home Access</button>
+        </div>
+
+        <div class="booking-tab-content" data-booking-tab-content="details">
         <div class="form-row">
           <div class="form-group">
             <label for="ownerName">Your Name</label>
@@ -355,7 +367,13 @@
           <label for="notes">Additional Notes</label>
           <textarea id="notes" name="notes" rows="4" placeholder="Anything else we should know?"></textarea>
         </div>
+        <div class="booking-tab-nav">
+          <span></span>
+          <button type="button" class="btn btn-outline booking-next">Next →</button>
+        </div>
+        </div>
 
+        <div class="booking-tab-content" data-booking-tab-content="emergency" hidden>
         <h3 class="form-section-title">Emergency &amp; Vet Info</h3>
         <div class="form-row">
           <div class="form-group">
@@ -381,7 +399,13 @@
           <label for="vetPhone">Vet Phone</label>
           <input type="tel" id="vetPhone" name="vetPhone" required />
         </div>
+        <div class="booking-tab-nav">
+          <button type="button" class="btn btn-outline booking-prev">← Back</button>
+          <button type="button" class="btn btn-outline booking-next">Next →</button>
+        </div>
+        </div>
 
+        <div class="booking-tab-content" data-booking-tab-content="pets" hidden>
         <h3 class="form-section-title">Pet Profile</h3>
         <div id="petProfiles">
           <div class="pet-profile-block" data-pet-index="1">
@@ -443,7 +467,13 @@
           </div>
         </div>
         <button type="button" id="addPetBtn" class="btn btn-outline pet-profile-add-btn">+ Add Another Pet</button>
+        <div class="booking-tab-nav">
+          <button type="button" class="btn btn-outline booking-prev">← Back</button>
+          <button type="button" class="btn btn-outline booking-next">Next →</button>
+        </div>
+        </div>
 
+        <div class="booking-tab-content" data-booking-tab-content="access" hidden>
         <h3 class="form-section-title">Home Access <span class="field-hint">(for drop-in visits — optional)</span></h3>
         <div class="form-row">
           <div class="form-group">
@@ -489,6 +519,11 @@
 
         <button type="submit" class="btn btn-primary btn-submit">Send Booking Request</button>
         <p class="booking-note">This will open your email app with a pre-filled message to <strong>wagsandwhiskersbymistillc@gmail.com</strong>, and open a pre-filled service contract you can print and sign.</p>
+        <div class="booking-tab-nav">
+          <button type="button" class="btn btn-outline booking-prev">← Back</button>
+          <span></span>
+        </div>
+        </div>
       </form>
     </div>
   </div>
