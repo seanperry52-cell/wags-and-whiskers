@@ -100,6 +100,12 @@ async function renderCalendar() {
   const bookedSet = new Set(availability.booked || []);
   const todayStr = ymd(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
 
+  // Overnight/Day Care bookings take up Misti's whole day, but a Drop-In
+  // visit or walk only needs a short time slot, so those days still show
+  // as available when Drop-In is the selected service.
+  const serviceType = document.getElementById('serviceType').value;
+  const isDropIn = DROP_IN_SERVICES.has(serviceType);
+
   calEl.innerHTML = '';
   ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(d => {
     const cell = document.createElement('div');
@@ -114,7 +120,7 @@ async function renderCalendar() {
     cell.className = 'cal-day';
     if (dateStr === todayStr) cell.classList.add('cal-today');
     if (blockedSet.has(dateStr)) cell.classList.add('cal-unavailable');
-    else if (bookedSet.has(dateStr)) cell.classList.add('cal-booked');
+    else if (bookedSet.has(dateStr) && !isDropIn) cell.classList.add('cal-booked');
     else cell.classList.add('cal-available');
     cell.textContent = day;
     calEl.appendChild(cell);
@@ -324,6 +330,7 @@ serviceTypeSelect.addEventListener('change', () => {
   startTimeInput.value = '';
   updateTimeFields();
   updateDistancePricing();
+  renderCalendar();
 });
 startDateInput.addEventListener('change', () => {
   startTimeInput.value = '';

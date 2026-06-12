@@ -247,6 +247,16 @@
       <button type="button" class="modal-close" id="bookingModalClose" aria-label="Close">&times;</button>
 
       <form id="bookingForm" class="booking-form">
+        <div class="form-group full booking-service-type">
+          <label for="serviceType">Service Type</label>
+          <select id="serviceType" name="serviceType" required>
+            <option value="" disabled selected>Select a service</option>
+            <option value="Drop-In Visit">Drop-In Visit</option>
+            <option value="Overnight Stay">Overnight Stay</option>
+            <option value="Day Care">Day Care</option>
+          </select>
+        </div>
+
         <div class="booking-top-row">
           <div class="calendar-card">
             <div class="calendar-header">
@@ -335,21 +345,10 @@
           </div>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="ownerPhone">Phone</label>
-            <input type="tel" id="ownerPhone" name="ownerPhone" required />
-            <span id="returningClientNote" class="field-hint"></span>
-          </div>
-          <div class="form-group">
-            <label for="serviceType">Service Type</label>
-            <select id="serviceType" name="serviceType" required>
-              <option value="" disabled selected>Select a service</option>
-              <option value="Drop-In Visit">Drop-In Visit</option>
-              <option value="Overnight Stay">Overnight Stay</option>
-              <option value="Day Care">Day Care</option>
-            </select>
-          </div>
+        <div class="form-group full">
+          <label for="ownerPhone">Phone</label>
+          <input type="tel" id="ownerPhone" name="ownerPhone" required />
+          <span id="returningClientNote" class="field-hint"></span>
         </div>
 
         <div class="booking-tab-nav">
