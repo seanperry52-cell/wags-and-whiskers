@@ -1276,36 +1276,73 @@ async function loadSiteReviews() {
 
 loadSiteReviews();
 
-// ── Reviews & photos carousels ───────────────────────────────────────────────
-const CAROUSEL_ROTATE_MS = 6000;
+// ── Reviews & photos card stacks ─────────────────────────────────────────────
+// Each stack shows one card at a time. Every tick either flips the front
+// card to its back (revealing the full review) or, if already flipped,
+// unflips it and sends it to the bottom of the stack so the next card rises
+// to the top showing its front.
+const STACK_TICK_MS = 6000;
 
-function setupCarousel(track, prevBtn, nextBtn) {
-  if (!track) return;
+function setupStack(stack, prevBtn, nextBtn) {
+  if (!stack) return;
+  const cards = [...stack.querySelectorAll('.review-card')];
+  if (!cards.length) return;
+  let order = cards.map((_, i) => i);
+  let showingBack = false;
 
-  function scrollBy(direction) {
-    const card = track.querySelector('.review-card');
-    const amount = card ? card.getBoundingClientRect().width + 24 : 300;
-    const maxScroll = track.scrollWidth - track.clientWidth;
-    let target = track.scrollLeft + direction * amount;
-    if (target >= maxScroll - 1) target = 0;
-    else if (target < 0) target = maxScroll;
-    track.scrollTo({ left: target, behavior: 'smooth' });
+  function render() {
+    cards.forEach(card => card.classList.remove('active'));
+    order.forEach((cardIndex, pos) => {
+      const card = cards[cardIndex];
+      card.style.setProperty('--stack-pos', pos);
+      card.style.zIndex = cards.length - pos;
+      if (pos === 0) card.classList.add('active');
+    });
   }
 
-  if (prevBtn) prevBtn.addEventListener('click', () => scrollBy(-1));
-  if (nextBtn) nextBtn.addEventListener('click', () => scrollBy(1));
+  function advance() {
+    cards[order[0]].classList.remove('flipped');
+    order.push(order.shift());
+    showingBack = false;
+    render();
+  }
 
-  let timer = setInterval(() => scrollBy(1), CAROUSEL_ROTATE_MS);
-  track.addEventListener('mouseenter', () => clearInterval(timer));
-  track.addEventListener('mouseleave', () => {
-    timer = setInterval(() => scrollBy(1), CAROUSEL_ROTATE_MS);
+  function tick() {
+    if (showingBack) {
+      advance();
+    } else {
+      cards[order[0]].classList.add('flipped');
+      showingBack = true;
+    }
+  }
+
+  render();
+  let timer = setInterval(tick, STACK_TICK_MS);
+
+  cards.forEach(card => {
+    card.addEventListener('click', () => {
+      if (!card.classList.contains('active')) return;
+      card.classList.toggle('flipped');
+      showingBack = card.classList.contains('flipped');
+    });
+  });
+
+  if (prevBtn) prevBtn.addEventListener('click', () => {
+    cards[order[0]].classList.remove('flipped');
+    order.unshift(order.pop());
+    showingBack = false;
+    render();
+  });
+  if (nextBtn) nextBtn.addEventListener('click', () => advance());
+
+  [prevBtn, nextBtn].forEach(btn => {
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      clearInterval(timer);
+      timer = setInterval(tick, STACK_TICK_MS);
+    });
   });
 }
 
-setupCarousel(document.getElementById('reviewsTrack'), document.querySelector('.reviews-prev'), document.querySelector('.reviews-next'));
-setupCarousel(document.getElementById('photosTrack'), document.querySelector('.photos-prev'), document.querySelector('.photos-next'));
-
-// Flip a review/photo card to reveal the back side on click/tap.
-document.querySelectorAll('.review-card').forEach(card => {
-  card.addEventListener('click', () => card.classList.toggle('flipped'));
-});
+setupStack(document.getElementById('reviewsTrack'), document.querySelector('.reviews-prev'), document.querySelector('.reviews-next'));
+setupStack(document.getElementById('photosTrack'), document.querySelector('.photos-prev'), document.querySelector('.photos-next'));
