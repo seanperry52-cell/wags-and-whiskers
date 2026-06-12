@@ -118,12 +118,71 @@ async function renderCalendar() {
     const dateStr = ymd(year, month, day);
     const cell = document.createElement('div');
     cell.className = 'cal-day';
+    cell.dataset.date = dateStr;
     if (dateStr === todayStr) cell.classList.add('cal-today');
     if (blockedSet.has(dateStr)) cell.classList.add('cal-unavailable');
     else if (bookedSet.has(dateStr) && !isDropIn) cell.classList.add('cal-booked');
     else cell.classList.add('cal-available');
     cell.textContent = day;
+    cell.addEventListener('click', () => openDayDetail(dateStr, cell.classList.contains('cal-unavailable')));
     calEl.appendChild(cell);
+  }
+}
+
+// ── Day detail modal ────────────────────────────────────────────────────────
+const dayDetailModal = document.getElementById('dayDetailModal');
+const dayDetailModalClose = document.getElementById('dayDetailModalClose');
+const dayDetailTitle = document.getElementById('dayDetailTitle');
+const dayDetailUnavailable = document.getElementById('dayDetailUnavailable');
+const dayDetailSlots = document.getElementById('dayDetailSlots');
+
+function openDayDetailModal() {
+  dayDetailModal.hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDayDetailModal() {
+  dayDetailModal.hidden = true;
+  document.body.style.overflow = '';
+}
+
+dayDetailModalClose.addEventListener('click', closeDayDetailModal);
+dayDetailModal.addEventListener('click', (e) => {
+  if (e.target === dayDetailModal) closeDayDetailModal();
+});
+
+async function openDayDetail(dateStr, isUnavailable) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  dayDetailTitle.textContent = new Date(y, m - 1, d).toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+  });
+
+  if (isUnavailable) {
+    dayDetailUnavailable.hidden = false;
+    dayDetailSlots.innerHTML = '';
+    openDayDetailModal();
+    return;
+  }
+
+  dayDetailUnavailable.hidden = true;
+  dayDetailSlots.innerHTML = '<p class="slots-loading">Loading times…</p>';
+  openDayDetailModal();
+
+  try {
+    const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${dateStr}`);
+    if (!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    dayDetailSlots.innerHTML = '';
+    (data.slots || []).forEach(s => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `slot-btn ${s.available ? 'slot-available' : 'slot-booked'}`;
+      btn.textContent = formatTime(s.time);
+      btn.disabled = true;
+      dayDetailSlots.appendChild(btn);
+    });
+  } catch (err) {
+    dayDetailSlots.innerHTML = '<p class="slots-error">Could not load times — please try again.</p>';
   }
 }
 

@@ -716,6 +716,13 @@ a { color: inherit; text-decoration: none; }
   border-radius: 8px;
   font-size: 0.85rem;
   font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.cal-day:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(74,55,40,0.15);
 }
 
 .cal-available { background: var(--cream-soft); color: var(--brown); }
@@ -760,6 +767,18 @@ a { color: inherit; text-decoration: none; }
 
 .field-hint.distance-out-of-range {
   color: #b3261e;
+}
+
+/* ── DAY DETAIL MODAL ── */
+.day-detail-modal-box {
+  max-width: 420px;
+}
+
+.day-detail-unavailable {
+  font-weight: 700;
+  color: #8a8378;
+  text-decoration: line-through;
+  margin-top: 0.6rem;
 }
 
 /* ── DROP-IN / WALK TIME SLOTS ── */
