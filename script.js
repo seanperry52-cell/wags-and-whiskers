@@ -945,6 +945,7 @@ bookingForm.addEventListener('submit', async (e) => {
     `Notes: ${d.notes || 'N/A'}`,
     `Emergency Contact: ${d.emergencyName || 'N/A'} ${d.emergencyPhone || ''}`.trim(),
     `Vet: ${d.vetName || 'N/A'} ${d.vetPhone || ''}`.trim(),
+    `Photo/Review Consent: ${d.photoConsent ? 'Yes' : 'No'}`,
   ];
   const body = lines.join('\n');
   const mailtoLink = `mailto:wagsandwhiskersbymistillc@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
