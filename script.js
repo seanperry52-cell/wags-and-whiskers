@@ -1187,6 +1187,10 @@ function escapeAttr(value) {
     .replace(/>/g, '&gt;');
 }
 
+// Section titles matching this pattern hold admin-locked rate/contract
+// terms and cannot be edited from the client portal.
+const LOCKED_SECTION_RE = /contract|rate|fee/i;
+
 function renderSectionValue(value) {
   if (value && typeof value === 'object') {
     return Object.entries(value)
@@ -1195,6 +1199,13 @@ function renderSectionValue(value) {
       .join('');
   }
   return `<p>${value}</p>`;
+}
+
+function renderSectionEditFields(sectionTitle, value) {
+  if (!value || typeof value !== 'object') return '';
+  return Object.entries(value)
+    .map(([label, v]) => `<div class="portal-booking-row portal-edit-row"><span>${label}</span><input type="text" data-section="${escapeAttr(sectionTitle)}" data-field="${escapeAttr(label)}" value="${escapeAttr(v)}" /></div>`)
+    .join('');
 }
 
 let activeOverviewSection = 'Your Information';
@@ -1207,7 +1218,8 @@ function renderOverviewBody() {
   if (!sectionKeys.includes(activeOverviewSection)) {
     activeOverviewSection = 'Your Information';
   }
-  const activeKey = isEditingProfile ? 'Your Information' : activeOverviewSection;
+  const activeKey = activeOverviewSection;
+  const isLockedSection = activeKey !== 'Your Information' && LOCKED_SECTION_RE.test(activeKey);
 
   let tabsHtml = '';
   if (!isEditingProfile && sectionKeys.length > 1) {
@@ -1229,11 +1241,14 @@ function renderOverviewBody() {
       }
     }
     contentHtml += '</div>';
+  } else if (isEditingProfile && !isLockedSection) {
+    contentHtml = `<div class="portal-section"><h4>${activeKey}</h4>${renderSectionEditFields(activeKey, sections[activeKey])}</div>`;
   } else {
     contentHtml = `<div class="portal-section"><h4>${activeKey}</h4>${renderSectionValue(sections[activeKey])}</div>`;
   }
 
   portalOverviewBody.innerHTML = tabsHtml + contentHtml;
+  editProfileBtn.hidden = isEditingProfile || isLockedSection;
 }
 
 portalOverviewBody.addEventListener('click', (e) => {
@@ -1247,10 +1262,9 @@ function renderPortalOverview(data) {
   currentPortalData = data;
   isEditingProfile = false;
   activeOverviewSection = 'Your Information';
-  renderOverviewBody();
-  editProfileBtn.hidden = false;
   editProfileActions.hidden = true;
   showEditProfileStatus('');
+  renderOverviewBody();
 }
 
 function renderPortalBookings(bookings) {
@@ -1280,26 +1294,32 @@ editProfileBtn.addEventListener('click', () => {
   if (!currentPortalData) return;
   isEditingProfile = true;
   showEditProfileStatus('');
-  renderOverviewBody();
-  editProfileBtn.hidden = true;
   editProfileActions.hidden = false;
+  renderOverviewBody();
 });
 
 cancelEditProfileBtn.addEventListener('click', () => {
   isEditingProfile = false;
   showEditProfileStatus('');
-  renderOverviewBody();
-  editProfileBtn.hidden = false;
   editProfileActions.hidden = true;
+  renderOverviewBody();
 });
 
 saveProfileBtn.addEventListener('click', async () => {
   if (!currentPortalData) return;
 
   const updates = { clientId: currentPortalData.clientId };
+  const sectionUpdates = {};
   portalOverviewBody.querySelectorAll('[data-field]').forEach((input) => {
-    updates[input.dataset.field] = input.value.trim();
+    const section = input.dataset.section;
+    if (section) {
+      sectionUpdates[section] = sectionUpdates[section] || {};
+      sectionUpdates[section][input.dataset.field] = input.value.trim();
+    } else {
+      updates[input.dataset.field] = input.value.trim();
+    }
   });
+  if (Object.keys(sectionUpdates).length) updates.sections = sectionUpdates;
 
   showEditProfileStatus('Saving...');
   try {
@@ -1317,6 +1337,14 @@ saveProfileBtn.addEventListener('click', async () => {
       clientId: result.clientId ?? currentPortalData.clientId,
     };
 
+    if (Object.keys(sectionUpdates).length) {
+      const mergedSections = { ...(currentPortalData.sections || {}) };
+      for (const [title, fields] of Object.entries(sectionUpdates)) {
+        mergedSections[title] = { ...(mergedSections[title] || {}), ...fields };
+      }
+      currentPortalData.sections = mergedSections;
+    }
+
     reviewOwnerName = currentPortalData.ownerName;
     reviewOwnerEmail = currentPortalData.ownerEmail;
     reviewOwnerPhone = currentPortalData.ownerPhone;
@@ -1325,7 +1353,6 @@ saveProfileBtn.addEventListener('click', async () => {
     welcomeTitle.textContent = `Welcome Back, ${firstName}! 🐾`;
 
     isEditingProfile = false;
-    editProfileBtn.hidden = false;
     editProfileActions.hidden = true;
     showEditProfileStatus('');
     renderOverviewBody();
