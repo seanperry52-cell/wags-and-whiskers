@@ -122,7 +122,7 @@ a { color: inherit; text-decoration: none; }
 /* ── HERO ── */
 .hero {
   position: relative;
-  min-height: 100vh;
+  min-height: 60vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -298,19 +298,25 @@ a { color: inherit; text-decoration: none; }
 [data-rotate="left"].in-view,
 [data-rotate="right"].in-view { transform: translateY(0) rotateY(0) rotateX(0); }
 
-/* ── ABOUT ── */
+/* ── ABOUT & SERVICES ── */
 .about { background: var(--cream-soft); }
 
-.about-grid {
+.about-services-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 2rem;
-  margin-bottom: 2.5rem;
+  align-items: start;
+}
+
+.about-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .about-card {
   background: #fff;
-  padding: 2.2rem;
+  padding: 1.8rem;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
@@ -322,14 +328,42 @@ a { color: inherit; text-decoration: none; }
 
 .about-tagline {
   text-align: center;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 600;
   color: var(--brown-light);
-  max-width: 700px;
-  margin: 0 auto;
 }
 
-/* ── SERVICES ── */
+.services-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.services-grid-compact {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.2rem;
+  margin-bottom: 0;
+}
+
+.services-grid-compact .tilt-inner {
+  padding: 1.4rem 1rem;
+}
+
+.services-grid-compact .card-icon {
+  font-size: 2rem;
+  margin-bottom: 0.6rem;
+}
+
+.services-grid-compact .tilt-inner h3 {
+  font-size: 1.05rem;
+}
+
+.services-grid-compact .tilt-inner p {
+  font-size: 0.85rem;
+}
+
+/* ── SERVICES (shared card grid) ── */
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -470,6 +504,32 @@ a { color: inherit; text-decoration: none; }
   font-weight: 700;
   margin-top: 0.4rem;
   color: var(--brown-light);
+}
+
+.reviews-carousel {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.reviews-track {
+  display: flex;
+  gap: 1.5rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  padding: 0.3rem 0.3rem 1rem;
+  flex: 1;
+}
+
+.reviews-track .review-card {
+  flex: 0 0 300px;
+  scroll-snap-align: start;
+}
+
+.reviews-prev,
+.reviews-next {
+  flex-shrink: 0;
 }
 
 .review-card {
@@ -840,11 +900,13 @@ input:focus, select:focus, textarea:focus {
   }
   .nav-links.open { transform: translateY(0); }
   #navToggle { display: flex; }
-  .about-grid { grid-template-columns: 1fr; }
+  .about-services-grid { grid-template-columns: 1fr; }
+  .services-grid-compact { grid-template-columns: 1fr 1fr; }
   .form-row { grid-template-columns: 1fr; }
   .nav-signin-item { order: -1; }
   .signin-form { flex-wrap: wrap; }
   .signin-form input { width: 100%; }
+  .reviews-track .review-card { flex-basis: 85vw; }
 }
 
 /* ── SIGN-IN WIDGET ── */

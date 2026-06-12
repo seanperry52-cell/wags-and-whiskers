@@ -1193,22 +1193,37 @@ reviewForm.addEventListener('submit', async (e) => {
 
 // ── Approved site reviews ────────────────────────────────────────────────────
 async function loadSiteReviews() {
-  const grid = document.getElementById('siteReviewsGrid');
-  if (!grid) return;
+  const track = document.getElementById('reviewsTrack');
+  if (!track) return;
   try {
     const res = await fetch(`${BOOKING_API}/api/reviews`);
     if (!res.ok) return;
     const reviews = await res.json();
-    grid.innerHTML = reviews.map(r => `
+    track.insertAdjacentHTML('beforeend', reviews.map(r => `
       <div class="review-card reveal in-view">
         <div class="stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div>
         <p>"${r.review_text}"</p>
         <span class="review-name">— ${r.owner_name}</span>
       </div>
-    `).join('');
+    `).join(''));
   } catch {
     // reviews unavailable — leave the static testimonials as-is
   }
 }
 
 loadSiteReviews();
+
+// ── Reviews carousel arrows ──────────────────────────────────────────────────
+const reviewsTrack = document.getElementById('reviewsTrack');
+const reviewsPrevBtn = document.querySelector('.reviews-prev');
+const reviewsNextBtn = document.querySelector('.reviews-next');
+
+function scrollReviews(direction) {
+  if (!reviewsTrack) return;
+  const card = reviewsTrack.querySelector('.review-card');
+  const amount = card ? card.getBoundingClientRect().width + 24 : 300;
+  reviewsTrack.scrollBy({ left: direction * amount, behavior: 'smooth' });
+}
+
+if (reviewsPrevBtn) reviewsPrevBtn.addEventListener('click', () => scrollReviews(-1));
+if (reviewsNextBtn) reviewsNextBtn.addEventListener('click', () => scrollReviews(1));
