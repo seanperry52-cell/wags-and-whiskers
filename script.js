@@ -157,14 +157,7 @@ async function openDayDetail(dateStr, isUnavailable) {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   });
 
-  if (isUnavailable) {
-    dayDetailUnavailable.hidden = false;
-    dayDetailSlots.innerHTML = '';
-    openDayDetailModal();
-    return;
-  }
-
-  dayDetailUnavailable.hidden = true;
+  dayDetailUnavailable.hidden = !isUnavailable;
   dayDetailSlots.innerHTML = '<p class="slots-loading">Loading times…</p>';
   openDayDetailModal();
 
