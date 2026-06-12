@@ -1061,8 +1061,12 @@ ratesNavBtn.addEventListener('click', (e) => {
 });
 
 // ── Returning-client sign-in / Welcome Back portal ──────────────────────────
-const signInForm = document.getElementById('signInForm');
-const signInStatus = document.getElementById('signInStatus');
+const petSignInForm = document.getElementById('petSignInForm');
+const signInStatus = document.getElementById('petSignInStatus');
+const petSignInModal = document.getElementById('petSignInModal');
+const petSignInModalClose = document.getElementById('petSignInModalClose');
+const signInBtn = document.getElementById('signInBtn');
+const newClientBtn = document.getElementById('newClientBtn');
 const welcomeModal = document.getElementById('welcomeModal');
 const welcomeModalClose = document.getElementById('welcomeModalClose');
 const welcomeTitle = document.getElementById('welcomeTitle');
@@ -1148,18 +1152,42 @@ function renderPortalBookings(bookings) {
   }).join('');
 }
 
-signInForm.addEventListener('submit', async (e) => {
+function openPetSignInModal() {
+  petSignInModal.hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function closePetSignInModal() {
+  petSignInModal.hidden = true;
+  document.body.style.overflow = '';
+}
+
+signInBtn.addEventListener('click', () => {
+  showSignInStatus('');
+  openPetSignInModal();
+});
+
+newClientBtn.addEventListener('click', () => {
+  openBookingModal();
+});
+
+petSignInModalClose.addEventListener('click', closePetSignInModal);
+petSignInModal.addEventListener('click', (e) => {
+  if (e.target === petSignInModal) closePetSignInModal();
+});
+
+petSignInForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const email = document.getElementById('signInEmail').value.trim();
+  const petName = document.getElementById('signInPetName').value.trim();
   const phone = document.getElementById('signInPhone').value.trim();
-  if (!email || !phone) return;
+  if (!petName || !phone) return;
 
   showSignInStatus('Looking you up...');
   try {
-    const res = await fetch(`${BOOKING_API}/api/client-portal?email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}`);
+    const res = await fetch(`${BOOKING_API}/api/client-portal?petName=${encodeURIComponent(petName)}&phone=${encodeURIComponent(phone)}`);
     const data = await res.json();
     if (!data.found) {
-      showSignInStatus("We couldn't find an account with that email and phone.");
+      showSignInStatus("We couldn't find an account with that pet name and phone.");
       return;
     }
 
@@ -1176,6 +1204,7 @@ signInForm.addEventListener('submit', async (e) => {
     reviewOwnerPhone = data.ownerPhone || '';
 
     switchClientTab('overview');
+    closePetSignInModal();
     openWelcomeModal();
   } catch {
     showSignInStatus('Something went wrong — please try again.');

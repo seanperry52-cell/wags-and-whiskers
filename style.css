@@ -1064,6 +1064,28 @@ input:focus, select:focus, textarea:focus {
   gap: 0.5rem;
 }
 
+.signin-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.signin-form-modal {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.signin-form-modal input {
+  width: 100%;
+}
+
+/* ── BOOK NOW CTA ── */
+.book-now-cta .section-inner {
+  text-align: center;
+}
+
 .signin-form input {
   font-family: 'Quicksand', sans-serif;
   font-size: 0.85rem;
