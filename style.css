@@ -1250,6 +1250,26 @@ input:focus, select:focus, textarea:focus {
   box-shadow: var(--shadow);
 }
 
+#editProfileBtn {
+  padding: 0.55rem 1.3rem;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.profile-edit-form {
+  margin-top: 0.5rem;
+}
+
+.profile-edit-actions {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.profile-edit-actions .btn {
+  padding: 0.7rem 1.6rem;
+  font-size: 0.9rem;
+}
+
 .portal-status {
   font-size: 0.75rem;
   font-weight: 700;

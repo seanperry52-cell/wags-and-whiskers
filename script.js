@@ -1125,6 +1125,10 @@ const welcomeTitle = document.getElementById('welcomeTitle');
 const welcomeSince = document.getElementById('welcomeSince');
 const portalOverviewBody = document.getElementById('portalOverviewBody');
 const portalBookingsBody = document.getElementById('portalBookingsBody');
+const editProfileBtn = document.getElementById('editProfileBtn');
+const editProfileForm = document.getElementById('editProfileForm');
+const cancelEditProfileBtn = document.getElementById('cancelEditProfileBtn');
+const editProfileStatus = document.getElementById('editProfileStatus');
 
 function openWelcomeModal() {
   welcomeModal.hidden = false;
@@ -1162,7 +1166,10 @@ function formatClientSince(unixSeconds) {
   return `Client since ${dateLabel} — that's ${parts.join(', ')}! 🐾`;
 }
 
+let currentPortalData = null;
+
 function renderPortalOverview(data) {
+  currentPortalData = data;
   const sections = data.sections || {};
   const rows = [
     ['Name', data.ownerName],
@@ -1184,6 +1191,8 @@ function renderPortalOverview(data) {
   }
 
   portalOverviewBody.innerHTML = html;
+  editProfileForm.hidden = true;
+  editProfileBtn.hidden = false;
 }
 
 function renderPortalBookings(bookings) {
@@ -1203,6 +1212,74 @@ function renderPortalBookings(bookings) {
     `;
   }).join('');
 }
+
+function showEditProfileStatus(message) {
+  editProfileStatus.textContent = message;
+  editProfileStatus.hidden = !message;
+}
+
+editProfileBtn.addEventListener('click', () => {
+  if (!currentPortalData) return;
+  document.getElementById('editOwnerName').value = currentPortalData.ownerName || '';
+  document.getElementById('editOwnerEmail').value = currentPortalData.ownerEmail || '';
+  document.getElementById('editOwnerPhone').value = currentPortalData.ownerPhone || '';
+  document.getElementById('editAddress').value = currentPortalData.address || '';
+  document.getElementById('editPetInfo').value = currentPortalData.petInfo || '';
+  showEditProfileStatus('');
+  editProfileForm.hidden = false;
+  editProfileBtn.hidden = true;
+});
+
+cancelEditProfileBtn.addEventListener('click', () => {
+  editProfileForm.hidden = true;
+  editProfileBtn.hidden = false;
+});
+
+editProfileForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!currentPortalData) return;
+
+  const updates = {
+    clientId: currentPortalData.clientId,
+    ownerName: document.getElementById('editOwnerName').value.trim(),
+    ownerEmail: document.getElementById('editOwnerEmail').value.trim(),
+    ownerPhone: document.getElementById('editOwnerPhone').value.trim(),
+    address: document.getElementById('editAddress').value.trim(),
+    petInfo: document.getElementById('editPetInfo').value.trim(),
+  };
+
+  showEditProfileStatus('Saving...');
+  try {
+    const res = await fetch(`${BOOKING_API}/api/client-portal`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('bad response');
+    const result = await res.json();
+
+    currentPortalData = {
+      ...currentPortalData,
+      clientId: result.clientId ?? currentPortalData.clientId,
+      ownerName: updates.ownerName,
+      ownerEmail: updates.ownerEmail,
+      ownerPhone: updates.ownerPhone,
+      address: updates.address,
+      petInfo: updates.petInfo,
+    };
+
+    reviewOwnerName = updates.ownerName;
+    reviewOwnerEmail = updates.ownerEmail;
+    reviewOwnerPhone = updates.ownerPhone;
+
+    const firstName = (updates.ownerName || '').split(' ')[0] || 'there';
+    welcomeTitle.textContent = `Welcome Back, ${firstName}! 🐾`;
+
+    renderPortalOverview(currentPortalData);
+  } catch {
+    showEditProfileStatus('Something went wrong — please try again.');
+  }
+});
 
 function openPetSignInModal() {
   petSignInModal.hidden = false;
