@@ -898,6 +898,10 @@ input:focus, select:focus, textarea:focus {
   z-index: 1000;
 }
 
+.modal-overlay[hidden] {
+  display: none;
+}
+
 .modal-box {
   position: relative;
   background: var(--cream);
