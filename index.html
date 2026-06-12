@@ -250,7 +250,6 @@
         <div class="booking-tabs">
           <button type="button" class="booking-tab active" data-booking-tab="schedule">Date &amp; Service</button>
           <button type="button" class="booking-tab" data-booking-tab="details">Your Info</button>
-          <button type="button" class="booking-tab" data-booking-tab="petinfo">Pet Info</button>
           <button type="button" class="booking-tab" data-booking-tab="emergency">Emergency &amp; Vet</button>
           <button type="button" class="booking-tab" data-booking-tab="pets">Pet Profile</button>
           <button type="button" class="booking-tab" data-booking-tab="access">Home Access</button>
@@ -371,27 +370,6 @@
         </div>
         </div>
 
-        <div class="booking-tab-content" data-booking-tab-content="petinfo" inert>
-        <div class="form-group full">
-          <label for="petInfo">Pet(s) Info</label>
-          <input type="text" id="petInfo" name="petInfo" placeholder="Name, type, breed, age, special needs..." required />
-        </div>
-
-        <div class="form-group full">
-          <label for="petPhotos">Pet Photo(s) <span class="field-hint">(optional)</span></label>
-          <input type="file" id="petPhotos" name="petPhotos" accept="image/*" multiple />
-        </div>
-
-        <div class="form-group full">
-          <label for="notes">Additional Notes</label>
-          <textarea id="notes" name="notes" rows="4" placeholder="Anything else we should know?"></textarea>
-        </div>
-        <div class="booking-tab-nav">
-          <button type="button" class="btn btn-outline booking-prev">← Back</button>
-          <button type="button" class="btn btn-outline booking-next">Next →</button>
-        </div>
-        </div>
-
         <div class="booking-tab-content" data-booking-tab-content="emergency" inert>
         <h3 class="form-section-title">Emergency &amp; Vet Info</h3>
         <div class="form-row">
@@ -425,6 +403,21 @@
         </div>
 
         <div class="booking-tab-content" data-booking-tab-content="pets" inert>
+        <div class="form-group full">
+          <label for="petInfo">Pet(s) Info</label>
+          <input type="text" id="petInfo" name="petInfo" placeholder="Name, type, breed, age, special needs..." required />
+        </div>
+
+        <div class="form-group full">
+          <label for="petPhotos">Pet Photo(s) <span class="field-hint">(optional)</span></label>
+          <input type="file" id="petPhotos" name="petPhotos" accept="image/*" multiple />
+        </div>
+
+        <div class="form-group full">
+          <label for="notes">Additional Notes</label>
+          <textarea id="notes" name="notes" rows="4" placeholder="Anything else we should know?"></textarea>
+        </div>
+
         <h3 class="form-section-title">Pet Profile</h3>
         <div id="petProfiles">
           <div class="pet-profile-block" data-pet-index="1">

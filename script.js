@@ -990,7 +990,7 @@ for (const id of ['heroBookBtn', 'navBookBtn']) {
 const bookingTabs = document.querySelectorAll('.booking-tab');
 const bookingTabContents = document.querySelectorAll('.booking-tab-content');
 const bookingTabsTrack = document.querySelector('.booking-tabs-track');
-const bookingTabOrder = ['schedule', 'details', 'petinfo', 'emergency', 'pets', 'access'];
+const bookingTabOrder = ['schedule', 'details', 'emergency', 'pets', 'access'];
 
 function showBookingTab(name) {
   const index = bookingTabOrder.indexOf(name);
