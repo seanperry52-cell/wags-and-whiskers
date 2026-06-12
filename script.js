@@ -962,7 +962,7 @@ const bookingModalClose = document.getElementById('bookingModalClose');
 function openBookingModal() {
   bookingModal.hidden = false;
   document.body.style.overflow = 'hidden';
-  showBookingTab('details');
+  showBookingTab('schedule');
 }
 
 function closeBookingModal() {
@@ -990,7 +990,7 @@ for (const id of ['heroBookBtn', 'navBookBtn']) {
 const bookingTabs = document.querySelectorAll('.booking-tab');
 const bookingTabContents = document.querySelectorAll('.booking-tab-content');
 const bookingTabsTrack = document.querySelector('.booking-tabs-track');
-const bookingTabOrder = ['details', 'petinfo', 'emergency', 'pets', 'access'];
+const bookingTabOrder = ['schedule', 'details', 'petinfo', 'emergency', 'pets', 'access'];
 
 function showBookingTab(name) {
   const index = bookingTabOrder.indexOf(name);

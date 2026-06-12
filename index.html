@@ -247,6 +247,19 @@
       <button type="button" class="modal-close" id="bookingModalClose" aria-label="Close">&times;</button>
 
       <form id="bookingForm" class="booking-form">
+        <div class="booking-tabs">
+          <button type="button" class="booking-tab active" data-booking-tab="schedule">Date &amp; Service</button>
+          <button type="button" class="booking-tab" data-booking-tab="details">Your Info</button>
+          <button type="button" class="booking-tab" data-booking-tab="petinfo">Pet Info</button>
+          <button type="button" class="booking-tab" data-booking-tab="emergency">Emergency &amp; Vet</button>
+          <button type="button" class="booking-tab" data-booking-tab="pets">Pet Profile</button>
+          <button type="button" class="booking-tab" data-booking-tab="access">Home Access</button>
+        </div>
+
+        <div class="booking-tabs-viewport">
+        <div class="booking-tabs-track">
+
+        <div class="booking-tab-content" data-booking-tab-content="schedule">
         <div class="form-group full booking-service-type">
           <label for="serviceType">Service Type</label>
           <select id="serviceType" name="serviceType" required>
@@ -321,19 +334,13 @@
             </div>
           </div>
         </div>
-
-        <div class="booking-tabs">
-          <button type="button" class="booking-tab active" data-booking-tab="details">Your Info &amp; Schedule</button>
-          <button type="button" class="booking-tab" data-booking-tab="petinfo">Pet Info</button>
-          <button type="button" class="booking-tab" data-booking-tab="emergency">Emergency &amp; Vet</button>
-          <button type="button" class="booking-tab" data-booking-tab="pets">Pet Profile</button>
-          <button type="button" class="booking-tab" data-booking-tab="access">Home Access</button>
+        <div class="booking-tab-nav">
+          <span></span>
+          <button type="button" class="btn btn-outline booking-next">Next →</button>
+        </div>
         </div>
 
-        <div class="booking-tabs-viewport">
-        <div class="booking-tabs-track">
-
-        <div class="booking-tab-content" data-booking-tab-content="details">
+        <div class="booking-tab-content" data-booking-tab-content="details" inert>
         <div class="form-row">
           <div class="form-group">
             <label for="ownerName">Your Name</label>
@@ -352,7 +359,7 @@
         </div>
 
         <div class="booking-tab-nav">
-          <span></span>
+          <button type="button" class="btn btn-outline booking-prev">← Back</button>
           <button type="button" class="btn btn-outline booking-next">Next →</button>
         </div>
         </div>
