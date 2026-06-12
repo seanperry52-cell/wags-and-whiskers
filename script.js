@@ -1276,22 +1276,36 @@ async function loadSiteReviews() {
 
 loadSiteReviews();
 
-// ── Reviews carousel arrows ──────────────────────────────────────────────────
-const reviewsTrack = document.getElementById('reviewsTrack');
-const reviewsPrevBtn = document.querySelector('.reviews-prev');
-const reviewsNextBtn = document.querySelector('.reviews-next');
+// ── Reviews & photos carousels ───────────────────────────────────────────────
+const CAROUSEL_ROTATE_MS = 6000;
 
-function scrollReviews(direction) {
-  if (!reviewsTrack) return;
-  const card = reviewsTrack.querySelector('.review-card');
-  const amount = card ? card.getBoundingClientRect().width + 24 : 300;
-  reviewsTrack.scrollBy({ left: direction * amount, behavior: 'smooth' });
+function setupCarousel(track, prevBtn, nextBtn) {
+  if (!track) return;
+
+  function scrollBy(direction) {
+    const card = track.querySelector('.review-card');
+    const amount = card ? card.getBoundingClientRect().width + 24 : 300;
+    const maxScroll = track.scrollWidth - track.clientWidth;
+    let target = track.scrollLeft + direction * amount;
+    if (target >= maxScroll - 1) target = 0;
+    else if (target < 0) target = maxScroll;
+    track.scrollTo({ left: target, behavior: 'smooth' });
+  }
+
+  if (prevBtn) prevBtn.addEventListener('click', () => scrollBy(-1));
+  if (nextBtn) nextBtn.addEventListener('click', () => scrollBy(1));
+
+  let timer = setInterval(() => scrollBy(1), CAROUSEL_ROTATE_MS);
+  track.addEventListener('mouseenter', () => clearInterval(timer));
+  track.addEventListener('mouseleave', () => {
+    timer = setInterval(() => scrollBy(1), CAROUSEL_ROTATE_MS);
+  });
 }
 
-if (reviewsPrevBtn) reviewsPrevBtn.addEventListener('click', () => scrollReviews(-1));
-if (reviewsNextBtn) reviewsNextBtn.addEventListener('click', () => scrollReviews(1));
+setupCarousel(document.getElementById('reviewsTrack'), document.querySelector('.reviews-prev'), document.querySelector('.reviews-next'));
+setupCarousel(document.getElementById('photosTrack'), document.querySelector('.photos-prev'), document.querySelector('.photos-next'));
 
-// Flip a review card to reveal the full review text on click/tap.
+// Flip a review/photo card to reveal the back side on click/tap.
 document.querySelectorAll('.review-card').forEach(card => {
   card.addEventListener('click', () => card.classList.toggle('flipped'));
 });
