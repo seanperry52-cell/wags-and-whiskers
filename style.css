@@ -566,6 +566,18 @@ a { color: inherit; text-decoration: none; }
   margin-bottom: 0.8rem;
 }
 
+.review-card-single {
+  overflow: hidden;
+}
+
+.review-card-single p {
+  font-style: italic;
+  color: var(--brown-light);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  overflow: hidden;
+}
+
 .review-card-front .review-name,
 .review-card-back .review-name {
   font-size: 1.1rem;

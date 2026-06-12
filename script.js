@@ -1283,7 +1283,7 @@ loadSiteReviews();
 // to the top showing its front.
 const STACK_TICK_MS = 6000;
 
-function setupStack(stack, prevBtn, nextBtn) {
+function setupStack(stack, prevBtn, nextBtn, { flip = true } = {}) {
   if (!stack) return;
   const cards = [...stack.querySelectorAll('.review-card')];
   if (!cards.length) return;
@@ -1308,6 +1308,10 @@ function setupStack(stack, prevBtn, nextBtn) {
   }
 
   function tick() {
+    if (!flip) {
+      advance();
+      return;
+    }
     if (showingBack) {
       advance();
     } else {
@@ -1319,13 +1323,15 @@ function setupStack(stack, prevBtn, nextBtn) {
   render();
   let timer = setInterval(tick, STACK_TICK_MS);
 
-  cards.forEach(card => {
-    card.addEventListener('click', () => {
-      if (!card.classList.contains('active')) return;
-      card.classList.toggle('flipped');
-      showingBack = card.classList.contains('flipped');
+  if (flip) {
+    cards.forEach(card => {
+      card.addEventListener('click', () => {
+        if (!card.classList.contains('active')) return;
+        card.classList.toggle('flipped');
+        showingBack = card.classList.contains('flipped');
+      });
     });
-  });
+  }
 
   if (prevBtn) prevBtn.addEventListener('click', () => {
     cards[order[0]].classList.remove('flipped');
@@ -1344,5 +1350,5 @@ function setupStack(stack, prevBtn, nextBtn) {
   });
 }
 
-setupStack(document.getElementById('reviewsTrack'), document.querySelector('.reviews-prev'), document.querySelector('.reviews-next'));
+setupStack(document.getElementById('reviewsTrack'), document.querySelector('.reviews-prev'), document.querySelector('.reviews-next'), { flip: false });
 setupStack(document.getElementById('photosTrack'), document.querySelector('.photos-prev'), document.querySelector('.photos-next'));
