@@ -433,15 +433,15 @@
               <span class="field-hint">Let us know if you'd like to set up a regular recurring schedule — extended/recurring rates may apply (see Rates &amp; Pricing).</span>
             </div>
 
-            <p id="ongoingScheduleNote" class="field-hint" hidden>As an ongoing/recurring client, no fixed start/end dates or times are needed here — we'll reach out to coordinate a recurring schedule based on availability.</p>
+            <p id="ongoingScheduleNote" class="field-hint" hidden>As an ongoing/recurring client, pick a preferred first date below — we'll reach out to coordinate the full recurring schedule based on availability.</p>
 
             <div id="scheduleFields">
               <div class="form-row">
                 <div class="form-group">
-                  <label for="startDate">Start Date</label>
+                  <label for="startDate" id="startDateLabel">Start Date</label>
                   <input type="date" id="startDate" name="startDate" required />
                 </div>
-                <div class="form-group">
+                <div class="form-group" id="endDateGroup">
                   <label for="endDate">End Date</label>
                   <input type="date" id="endDate" name="endDate" />
                 </div>

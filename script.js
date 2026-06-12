@@ -195,6 +195,7 @@ const DROP_IN_SERVICES = new Set(['Drop-In Visit']);
 
 const serviceTypeSelect = document.getElementById('serviceType');
 const startDateInput = document.getElementById('startDate');
+const startDateLabel = document.getElementById('startDateLabel');
 const startTimeGroup = document.getElementById('startTimeGroup');
 const startTimeLabel = document.getElementById('startTimeLabel');
 const startTimeInput = document.getElementById('startTime');
@@ -203,6 +204,7 @@ const endTimeInput = document.getElementById('endTime');
 const dropinSlotsGroup = document.getElementById('dropinSlotsGroup');
 const dropinSlots = document.getElementById('dropinSlots');
 const endDateInput = document.getElementById('endDate');
+const endDateGroup = document.getElementById('endDateGroup');
 const scheduleFields = document.getElementById('scheduleFields');
 const ongoingScheduleNote = document.getElementById('ongoingScheduleNote');
 const clientTypeRadios = document.querySelectorAll('input[name="clientType"]');
@@ -361,17 +363,17 @@ function isOngoingClient() {
   return [...clientTypeRadios].find(r => r.checked)?.value === 'Ongoing';
 }
 
-function todayISO() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-}
-
 function updateBookingTypeFields() {
   const ongoing = isOngoingClient();
-  scheduleFields.hidden = ongoing;
+  scheduleFields.hidden = false;
   ongoingScheduleNote.hidden = !ongoing;
-  startDateInput.required = !ongoing;
+  endDateGroup.hidden = ongoing;
+  startDateInput.required = true;
+  startDateLabel.textContent = ongoing ? 'Preferred First Date' : 'Start Date';
   if (ongoing) {
+    startTimeGroup.hidden = true;
+    endTimeGroup.hidden = true;
+    dropinSlotsGroup.hidden = true;
     selectedSlots.clear();
   } else {
     updateTimeFields();
@@ -719,7 +721,7 @@ function buildContractHtml(d) {
   }
 
   const dateRange = d.clientType === 'Ongoing'
-    ? 'Ongoing &mdash; schedule based on availability'
+    ? `Ongoing &mdash; schedule based on availability<br><small>Preferred first date: ${formatDate(d.startDate)}</small>`
     : (d.endDate && d.endDate !== d.startDate
       ? `${formatDate(d.startDate)} &ndash; ${formatDate(d.endDate)}`
       : formatDate(d.startDate));
@@ -936,7 +938,6 @@ bookingForm.addEventListener('submit', async (e) => {
   }
 
   if (ongoing) {
-    d.startDate = todayISO();
     d.endDate = '';
     d.startTime = '';
   } else if (DROP_IN_SERVICES.has(d.serviceType)) {
@@ -989,7 +990,7 @@ bookingForm.addEventListener('submit', async (e) => {
     `Phone: ${d.ownerPhone || 'N/A'}`,
     `Service Type: ${d.serviceType}`,
     `Booking Type: ${d.clientType === 'Ongoing' ? 'Ongoing / recurring (schedule based on availability)' : 'One-time'}`,
-    `Start Date: ${d.clientType === 'Ongoing' ? 'N/A — ongoing client' : d.startDate}`,
+    `${d.clientType === 'Ongoing' ? 'Preferred First Date' : 'Start Date'}: ${d.startDate}`,
     `End Date: ${d.endDate || 'N/A'}`,
     `Preferred Time: ${d.startTime || 'N/A'}`,
     `Pet(s) Info: ${d.petInfo}`,
