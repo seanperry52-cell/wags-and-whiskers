@@ -18,8 +18,13 @@
   <div id="welcomeModal" class="modal-overlay" hidden>
     <div class="modal-box welcome-modal">
       <button type="button" class="modal-close" id="welcomeModalClose" aria-label="Close">&times;</button>
-      <h2 id="welcomeTitle" class="welcome-title">Welcome Back!</h2>
-      <p id="welcomeSince" class="welcome-since"></p>
+      <div class="welcome-header">
+        <img id="welcomeAvatar" class="welcome-avatar" alt="" hidden />
+        <div>
+          <h2 id="welcomeTitle" class="welcome-title">Welcome Back!</h2>
+          <p id="welcomeSince" class="welcome-since"></p>
+        </div>
+      </div>
 
       <div class="client-tabs">
         <button type="button" class="client-tab active" data-tab="overview">Overview</button>

@@ -1184,6 +1184,22 @@ input:focus, select:focus, textarea:focus {
 }
 
 /* ── WELCOME BACK MODAL ── */
+.welcome-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+}
+
+.welcome-avatar {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 2px solid var(--rust-light);
+  flex-shrink: 0;
+}
+
 .welcome-title {
   font-family: 'Playfair Display', serif;
   color: var(--brown);
@@ -1196,6 +1212,37 @@ input:focus, select:focus, textarea:focus {
   text-align: center;
   color: var(--brown-light);
   margin: 0 0 1.5rem;
+}
+
+.portal-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 0.8rem;
+}
+
+.portal-avatar-img,
+.portal-avatar-placeholder {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.portal-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cream-soft);
+  border: 2px dashed var(--rust-light);
+  font-size: 1.6rem;
+}
+
+.portal-avatar-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .client-tabs {

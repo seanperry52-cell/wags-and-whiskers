@@ -1123,6 +1123,7 @@ const welcomeModal = document.getElementById('welcomeModal');
 const welcomeModalClose = document.getElementById('welcomeModalClose');
 const welcomeTitle = document.getElementById('welcomeTitle');
 const welcomeSince = document.getElementById('welcomeSince');
+const welcomeAvatar = document.getElementById('welcomeAvatar');
 const portalOverviewBody = document.getElementById('portalOverviewBody');
 const portalBookingsBody = document.getElementById('portalBookingsBody');
 const editProfileBtn = document.getElementById('editProfileBtn');
@@ -1231,6 +1232,7 @@ function renderOverviewBody() {
   let contentHtml;
   if (activeKey === 'Your Information') {
     contentHtml = '<div class="portal-section"><h4>Your Information</h4>';
+    contentHtml += renderProfilePicHtml();
     for (const [key, label, type] of PROFILE_FIELDS) {
       const value = data[key] || '';
       if (!value && !isEditingProfile) continue;
@@ -1255,6 +1257,78 @@ function renderOverviewBody() {
 
 function isPetProfileSection(sectionTitle) {
   return /dog profile|pet profile|cat profile/i.test(sectionTitle);
+}
+
+function updateWelcomeAvatar() {
+  const data = currentPortalData;
+  const avatar = data?.profilePhoto || data?.photos?.[0];
+  if (avatar) {
+    welcomeAvatar.src = `${BOOKING_API}/uploads/${avatar}`;
+    welcomeAvatar.hidden = false;
+  } else {
+    welcomeAvatar.hidden = true;
+    welcomeAvatar.src = '';
+  }
+}
+
+function renderProfilePicHtml() {
+  const data = currentPortalData;
+  if (!data?.clientId) return '';
+  const profilePhoto = data.profilePhoto;
+  const fallback = data.photos?.[0];
+  const avatar = profilePhoto || fallback;
+  const imgHtml = avatar
+    ? `<img src="${BOOKING_API}/uploads/${avatar}" alt="Profile picture" class="portal-avatar-img" />`
+    : `<span class="portal-avatar-placeholder">🐾</span>`;
+  const removeHtml = profilePhoto
+    ? `<button type="button" id="portalProfilePicRemove" class="btn btn-outline">Remove</button>`
+    : '';
+  return `
+    <div class="portal-avatar-row">
+      ${imgHtml}
+      <div class="portal-avatar-actions">
+        <label class="btn btn-outline" for="portalProfilePicInput">Set Profile Picture</label>
+        <input type="file" accept="image/*" hidden id="portalProfilePicInput" />
+        ${removeHtml}
+      </div>
+    </div>
+    <p id="portalProfilePicStatus" class="booking-status" hidden></p>
+  `;
+}
+
+async function uploadProfilePic(file) {
+  if (!file || !currentPortalData?.clientId) return;
+  const formData = new FormData();
+  formData.append('photo', file);
+  const status = document.getElementById('portalProfilePicStatus');
+  if (status) { status.textContent = 'Uploading...'; status.hidden = false; }
+  try {
+    const res = await fetch(`${BOOKING_API}/api/client-portal/${currentPortalData.clientId}/profile-photo`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) throw new Error('bad response');
+    const result = await res.json();
+    currentPortalData.profilePhoto = result.profilePhoto;
+    updateWelcomeAvatar();
+    renderOverviewBody();
+  } catch {
+    if (status) { status.textContent = 'Upload failed — please try again.'; status.hidden = false; }
+  }
+}
+
+async function removeProfilePic() {
+  if (!currentPortalData?.clientId) return;
+  try {
+    const res = await fetch(`${BOOKING_API}/api/client-portal/${currentPortalData.clientId}/profile-photo`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('bad response');
+    const result = await res.json();
+    currentPortalData.profilePhoto = result.profilePhoto;
+    updateWelcomeAvatar();
+    renderOverviewBody();
+  } catch {}
 }
 
 function renderPhotosHtml() {
@@ -1326,12 +1400,19 @@ portalOverviewBody.addEventListener('click', (e) => {
   const removeBtn = e.target.closest('.portal-photo-remove');
   if (removeBtn) {
     removeClientPhoto(removeBtn.dataset.path);
+    return;
+  }
+  if (e.target.closest('#portalProfilePicRemove')) {
+    removeProfilePic();
   }
 });
 
 portalOverviewBody.addEventListener('change', (e) => {
   if (e.target.id === 'portalPhotoInput') {
     uploadClientPhotos(e.target.files);
+  }
+  if (e.target.id === 'portalProfilePicInput') {
+    uploadProfilePic(e.target.files?.[0]);
   }
 });
 
@@ -1341,6 +1422,7 @@ function renderPortalOverview(data) {
   activeOverviewSection = 'Your Information';
   editProfileActions.hidden = true;
   showEditProfileStatus('');
+  updateWelcomeAvatar();
   renderOverviewBody();
 }
 
