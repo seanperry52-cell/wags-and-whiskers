@@ -424,29 +424,12 @@ a { color: inherit; text-decoration: none; }
 /* ── RATES ── */
 .rates-grid {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  margin-top: 1.5rem;
 }
 
-.rates-details { margin-top: 1rem; }
-
-.rates-summary {
-  cursor: pointer;
-  list-style: none;
-  display: inline-block;
-  font-weight: 700;
-  font-family: 'Playfair Display', serif;
-  font-size: 1.05rem;
-  color: #fff;
-  background: var(--rust);
-  padding: 0.7rem 1.6rem;
-  border-radius: 999px;
-  transition: background 0.25s, transform 0.25s;
+.rates-modal-box {
+  max-width: 900px;
 }
-
-.rates-summary:hover { background: var(--rust-light); transform: translateY(-2px); }
-.rates-summary::-webkit-details-marker { display: none; }
-
-.rates-details .rates-grid,
-.rates-details > .about-tagline { margin-top: 1.5rem; }
 
 .rate-card {
   background: #fff;

@@ -995,6 +995,32 @@ for (const id of ['heroBookBtn', 'navBookBtn']) {
   }
 }
 
+// ── Rates modal ──────────────────────────────────────────────────────────────
+const ratesModal = document.getElementById('ratesModal');
+const ratesModalClose = document.getElementById('ratesModalClose');
+const ratesNavBtn = document.getElementById('ratesNavBtn');
+
+function openRatesModal() {
+  ratesModal.hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function closeRatesModal() {
+  ratesModal.hidden = true;
+  document.body.style.overflow = '';
+}
+
+ratesModalClose.addEventListener('click', closeRatesModal);
+ratesModal.addEventListener('click', (e) => {
+  if (e.target === ratesModal) closeRatesModal();
+});
+
+ratesNavBtn.addEventListener('click', (e) => {
+  e.preventDefault();
+  navLinks.classList.remove('open');
+  openRatesModal();
+});
+
 // ── Returning-client sign-in / Welcome Back portal ──────────────────────────
 const signInForm = document.getElementById('signInForm');
 const signInStatus = document.getElementById('signInStatus');

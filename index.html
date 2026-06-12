@@ -28,7 +28,7 @@
         <li><a href="#home">Home</a></li>
         <li><a href="#about">About</a></li>
         <li><a href="#services">Services</a></li>
-        <li><a href="#rates">Rates</a></li>
+        <li><a href="#" id="ratesNavBtn">Rates</a></li>
         <li><a href="#reviews">Reviews</a></li>
         <li class="nav-signin-item">
           <form id="signInForm" class="signin-form" autocomplete="on">
@@ -173,16 +173,14 @@
     </div>
   </section>
 
-  <!-- RATES -->
-  <section id="rates" class="section rates">
-    <div class="section-inner">
-      <h2 class="section-title reveal">Rates &amp; Pricing</h2>
-
-      <details class="rates-details">
-      <summary class="rates-summary">View Rates &amp; Pricing</summary>
+  <!-- RATES MODAL -->
+  <div id="ratesModal" class="modal-overlay" hidden>
+    <div class="modal-box rates-modal-box">
+      <button type="button" class="modal-close" id="ratesModalClose" aria-label="Close">&times;</button>
+      <h2 class="section-title">Rates &amp; Pricing</h2>
 
       <div class="card-grid rates-grid">
-        <div class="rate-card reveal">
+        <div class="rate-card">
           <h3>🏠 Drop-In Visits <span class="rate-card-sub">at your home, near 64119</span></h3>
           <div class="rate-row"><span>30 min &middot; under 5 mi</span><span>$16</span></div>
           <div class="rate-row"><span>30 min &middot; 5+ mi</span><span>$18</span></div>
@@ -193,14 +191,14 @@
           <div class="rate-row"><span>Extended (14+ visits) 30 min &middot; 5+ mi</span><span>$17</span></div>
         </div>
 
-        <div class="rate-card reveal">
+        <div class="rate-card">
           <h3>🐕 Day Care <span class="rate-card-sub">at Misti's home</span></h3>
           <div class="rate-row"><span>One dog per day</span><span>$40</span></div>
           <div class="rate-row"><span>Additional dog</span><span>$25</span></div>
           <div class="rate-row"><span>Puppy (under 1 year)</span><span>$45</span></div>
         </div>
 
-        <div class="rate-card reveal">
+        <div class="rate-card">
           <h3>🌙 Overnight Boarding <span class="rate-card-sub">at Misti's home</span></h3>
           <div class="rate-row"><span>Overnight (24 hours)</span><span>$45</span></div>
           <div class="rate-row"><span>Additional dog</span><span>$30</span></div>
@@ -211,10 +209,9 @@
 
       </div>
 
-      <p class="about-tagline reveal">We tailor each visit to your pet's needs! 🐾</p>
-      </details>
+      <p class="about-tagline">We tailor each visit to your pet's needs! 🐾</p>
     </div>
-  </section>
+  </div>
 
   <!-- REVIEWS -->
   <section id="reviews" class="section reviews">
