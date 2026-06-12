@@ -1422,7 +1422,56 @@ input:focus, select:focus, textarea:focus {
 .portal-status-approved { background: #d8efd9; color: #2f7d3a; }
 .portal-status-pending { background: #fdeecb; color: #b9760a; }
 .portal-status-declined,
-.portal-status-rejected { background: #f9d6d6; color: #b8392c; }
+.portal-status-rejected,
+.portal-status-cancelled { background: #f9d6d6; color: #b8392c; }
+
+.portal-booking-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  margin-bottom: 0.6rem;
+  box-shadow: var(--shadow);
+}
+
+.portal-booking-card .portal-booking-row {
+  background: none;
+  padding: 0;
+  margin-bottom: 0;
+  box-shadow: none;
+}
+
+.portal-cancel-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+.portal-cancel-actions .btn {
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+}
+
+.portal-cancel-confirm {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid #eee;
+}
+
+.portal-cancel-confirm p {
+  margin: 0 0 0.6rem;
+  font-size: 0.9rem;
+}
+
+.portal-cancel-confirm-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+}
+
+.portal-cancel-confirm-actions .btn {
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+}
 
 /* ── REVIEW FORM ── */
 .review-stars-label {

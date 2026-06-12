@@ -1427,6 +1427,22 @@ function renderPortalOverview(data) {
   renderOverviewBody();
 }
 
+// Mirrors the published Cancellation Policy on the Forms & Policies page.
+function cancellationPolicyInfo(startDateStr) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysUntil = Math.round((new Date(`${startDateStr}T00:00:00`) - today) / 86400000);
+  if (daysUntil >= 5) {
+    return 'This appointment is 5 or more days away, so per our Cancellation Policy any money you\'ve prepaid will be fully refunded (100%).';
+  } else if (daysUntil >= 1) {
+    return 'This appointment is less than 5 days away. Per our Cancellation Policy, 50% of the total scheduled service fee applies — you\'ll be refunded 50% of any prepayment.';
+  } else {
+    return 'This appointment is within 24 hours (or has already started). Per our Cancellation Policy, 100% of the total scheduled service fee applies and no refund will be issued.';
+  }
+}
+
+const CANCELLABLE_STATUSES = new Set(['pending', 'approved']);
+
 function renderPortalBookings(bookings) {
   if (!bookings || !bookings.length) {
     portalBookingsBody.innerHTML = '<p>No past bookings yet.</p>';
@@ -1436,14 +1452,72 @@ function renderPortalBookings(bookings) {
     const dates = b.end_date && b.end_date !== b.start_date
       ? `${formatDate(b.start_date)} – ${formatDate(b.end_date)}`
       : formatDate(b.start_date);
+    const cancelUi = CANCELLABLE_STATUSES.has(b.status) ? `
+      <div class="portal-cancel-actions">
+        <button type="button" class="btn btn-outline btn-cancel-reservation" data-booking-id="${b.id}" data-start-date="${b.start_date}">Cancel Reservation</button>
+      </div>
+      <div class="portal-cancel-confirm" data-booking-id="${b.id}" hidden></div>
+    ` : '';
     return `
-      <div class="portal-booking-row">
-        <span><strong>${b.service_type}</strong><br />${dates}</span>
-        <span class="portal-status portal-status-${b.status}">${b.status}</span>
+      <div class="portal-booking-card">
+        <div class="portal-booking-row">
+          <span><strong>${b.service_type}</strong><br />${dates}</span>
+          <span class="portal-status portal-status-${b.status}">${b.status}</span>
+        </div>
+        ${cancelUi}
       </div>
     `;
   }).join('');
 }
+
+portalBookingsBody.addEventListener('click', async (e) => {
+  const cancelBtn = e.target.closest('.btn-cancel-reservation');
+  if (cancelBtn) {
+    const { bookingId, startDate } = cancelBtn.dataset;
+    const confirmPanel = portalBookingsBody.querySelector(`.portal-cancel-confirm[data-booking-id="${bookingId}"]`);
+    if (!confirmPanel) return;
+    confirmPanel.hidden = false;
+    cancelBtn.hidden = true;
+    confirmPanel.innerHTML = `
+      <p>${cancellationPolicyInfo(startDate)}</p>
+      <div class="portal-cancel-confirm-actions">
+        <button type="button" class="btn btn-outline btn-keep-reservation">No, keep my reservation</button>
+        <button type="button" class="btn btn-primary btn-confirm-cancel" data-booking-id="${bookingId}">Yes, cancel reservation</button>
+      </div>
+    `;
+    return;
+  }
+
+  const keepBtn = e.target.closest('.btn-keep-reservation');
+  if (keepBtn) {
+    const confirmPanel = keepBtn.closest('.portal-cancel-confirm');
+    const cancelActions = confirmPanel.previousElementSibling;
+    confirmPanel.hidden = true;
+    confirmPanel.innerHTML = '';
+    cancelActions.querySelector('.btn-cancel-reservation').hidden = false;
+    return;
+  }
+
+  const confirmBtn = e.target.closest('.btn-confirm-cancel');
+  if (confirmBtn) {
+    const { bookingId } = confirmBtn.dataset;
+    const confirmPanel = confirmBtn.closest('.portal-cancel-confirm');
+    confirmPanel.innerHTML = '<p>Cancelling…</p>';
+    try {
+      const res = await fetch(`${BOOKING_API}/api/client-portal/bookings/${bookingId}/cancel`, { method: 'POST' });
+      if (!res.ok) throw new Error('bad response');
+      const result = await res.json();
+      confirmPanel.innerHTML = `<p>${result.policyNote}</p>`;
+      if (currentPortalData?.bookings) {
+        const booking = currentPortalData.bookings.find(b => String(b.id) === String(bookingId));
+        if (booking) booking.status = 'cancelled';
+        renderPortalBookings(currentPortalData.bookings);
+      }
+    } catch (err) {
+      confirmPanel.innerHTML = '<p>Something went wrong cancelling this reservation. Please try again or contact us directly.</p>';
+    }
+  }
+});
 
 function showEditProfileStatus(message) {
   editProfileStatus.textContent = message;
