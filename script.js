@@ -967,7 +967,6 @@ document.getElementById('year').textContent = new Date().getFullYear();
 
 // ── Booking modal ────────────────────────────────────────────────────────────
 const bookingModal = document.getElementById('bookingModal');
-const openBookingModalBtn = document.getElementById('openBookingModalBtn');
 const bookingModalClose = document.getElementById('bookingModalClose');
 
 function openBookingModal() {
@@ -980,7 +979,6 @@ function closeBookingModal() {
   document.body.style.overflow = '';
 }
 
-openBookingModalBtn.addEventListener('click', openBookingModal);
 bookingModalClose.addEventListener('click', closeBookingModal);
 bookingModal.addEventListener('click', (e) => {
   if (e.target === bookingModal) closeBookingModal();
