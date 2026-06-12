@@ -264,6 +264,7 @@
       <form id="bookingForm" class="booking-form">
         <div class="booking-tabs">
           <button type="button" class="booking-tab active" data-booking-tab="details">Your Info &amp; Schedule</button>
+          <button type="button" class="booking-tab" data-booking-tab="petinfo">Pet Info</button>
           <button type="button" class="booking-tab" data-booking-tab="emergency">Emergency &amp; Vet</button>
           <button type="button" class="booking-tab" data-booking-tab="pets">Pet Profile</button>
           <button type="button" class="booking-tab" data-booking-tab="access">Home Access</button>
@@ -346,7 +347,13 @@
             <div id="dropinSlots" class="dropin-slots"></div>
           </div>
         </div>
+        <div class="booking-tab-nav">
+          <span></span>
+          <button type="button" class="btn btn-outline booking-next">Next →</button>
+        </div>
+        </div>
 
+        <div class="booking-tab-content" data-booking-tab-content="petinfo" inert>
         <div class="form-group full">
           <label for="petInfo">Pet(s) Info</label>
           <input type="text" id="petInfo" name="petInfo" placeholder="Name, type, breed, age, special needs..." required />
@@ -369,7 +376,7 @@
           <textarea id="notes" name="notes" rows="4" placeholder="Anything else we should know?"></textarea>
         </div>
         <div class="booking-tab-nav">
-          <span></span>
+          <button type="button" class="btn btn-outline booking-prev">← Back</button>
           <button type="button" class="btn btn-outline booking-next">Next →</button>
         </div>
         </div>
