@@ -1241,6 +1241,7 @@ function renderOverviewBody() {
       }
     }
     contentHtml += '</div>';
+    if (!isEditingProfile) contentHtml += renderPhotosHtml();
   } else if (isEditingProfile && !isLockedSection) {
     contentHtml = `<div class="portal-section"><h4>${activeKey}</h4>${renderSectionEditFields(activeKey, sections[activeKey])}</div>`;
   } else {
@@ -1251,11 +1252,82 @@ function renderOverviewBody() {
   editProfileBtn.hidden = isEditingProfile || isLockedSection;
 }
 
+function renderPhotosHtml() {
+  const data = currentPortalData;
+  if (!data.clientId) return '';
+  const photos = data.photos || [];
+  const limit = data.photoLimit || 2;
+  const photosHtml = photos.map((p) => `
+    <div class="portal-photo">
+      <img src="${BOOKING_API}/uploads/${p}" alt="Pet photo" />
+      <button type="button" class="portal-photo-remove" data-path="${escapeAttr(p)}">&times;</button>
+    </div>
+  `).join('');
+  const addHtml = photos.length < limit
+    ? `<label class="portal-photo-add">+<input type="file" accept="image/*" multiple hidden id="portalPhotoInput" /></label>`
+    : '';
+  return `
+    <div class="portal-section">
+      <h4>Pet Photos</h4>
+      <div class="portal-photos">${photosHtml}${addHtml}</div>
+      <p id="portalPhotoStatus" class="booking-status" hidden></p>
+    </div>
+  `;
+}
+
+async function uploadClientPhotos(files) {
+  if (!files || !files.length || !currentPortalData?.clientId) return;
+  const formData = new FormData();
+  for (const file of files) formData.append('photos', file);
+  const status = document.getElementById('portalPhotoStatus');
+  if (status) { status.textContent = 'Uploading...'; status.hidden = false; }
+  try {
+    const res = await fetch(`${BOOKING_API}/api/client-portal/${currentPortalData.clientId}/photos`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) throw new Error('bad response');
+    const result = await res.json();
+    currentPortalData.photos = result.photos;
+    if (result.limit) currentPortalData.photoLimit = result.limit;
+    renderOverviewBody();
+  } catch {
+    if (status) { status.textContent = 'Upload failed — please try again.'; status.hidden = false; }
+  }
+}
+
+async function removeClientPhoto(path) {
+  if (!currentPortalData?.clientId) return;
+  try {
+    const res = await fetch(`${BOOKING_API}/api/client-portal/${currentPortalData.clientId}/photos`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    });
+    if (!res.ok) throw new Error('bad response');
+    const result = await res.json();
+    currentPortalData.photos = result.photos;
+    renderOverviewBody();
+  } catch {}
+}
+
 portalOverviewBody.addEventListener('click', (e) => {
-  const btn = e.target.closest('.overview-sub-tab');
-  if (!btn) return;
-  activeOverviewSection = btn.dataset.section;
-  renderOverviewBody();
+  const tabBtn = e.target.closest('.overview-sub-tab');
+  if (tabBtn) {
+    activeOverviewSection = tabBtn.dataset.section;
+    renderOverviewBody();
+    return;
+  }
+  const removeBtn = e.target.closest('.portal-photo-remove');
+  if (removeBtn) {
+    removeClientPhoto(removeBtn.dataset.path);
+  }
+});
+
+portalOverviewBody.addEventListener('change', (e) => {
+  if (e.target.id === 'portalPhotoInput') {
+    uploadClientPhotos(e.target.files);
+  }
 });
 
 function renderPortalOverview(data) {
