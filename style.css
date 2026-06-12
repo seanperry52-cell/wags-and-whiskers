@@ -720,7 +720,7 @@ a { color: inherit; text-decoration: none; }
 
 .cal-available { background: var(--cream-soft); color: var(--brown); }
 .cal-booked { background: #f3d9c4; color: var(--rust); }
-.cal-unavailable { background: #cfc9bd; color: #8a8378; text-decoration: line-through; }
+.cal-unavailable { background: #a39c8e; color: #f5f1e8; text-decoration: line-through; }
 .cal-today { box-shadow: inset 0 0 0 2px var(--rust); }
 
 .calendar-legend {
@@ -743,7 +743,7 @@ a { color: inherit; text-decoration: none; }
 
 .dot-available { background: var(--cream-soft); border: 1px solid #ddd; }
 .dot-booked { background: #f3d9c4; }
-.dot-unavailable { background: #cfc9bd; }
+.dot-unavailable { background: #a39c8e; }
 
 .calendar-note {
   text-align: center;
