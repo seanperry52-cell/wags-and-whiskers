@@ -120,11 +120,13 @@ async function renderCalendar() {
     cell.className = 'cal-day';
     cell.dataset.date = dateStr;
     if (dateStr === todayStr) cell.classList.add('cal-today');
-    if (blockedSet.has(dateStr)) cell.classList.add('cal-unavailable');
-    else if (bookedSet.has(dateStr) && !isDropIn) cell.classList.add('cal-booked');
+    const unavailableForService = blockedSet.has(dateStr) || (bookedSet.has(dateStr) && !isDropIn);
+    if (unavailableForService) cell.classList.add('cal-unavailable');
     else cell.classList.add('cal-available');
     cell.textContent = day;
-    cell.addEventListener('click', () => openDayDetail(dateStr, cell.classList.contains('cal-unavailable')));
+    if (!unavailableForService) {
+      cell.addEventListener('click', () => openDayDetail(dateStr));
+    }
     calEl.appendChild(cell);
   }
 }
@@ -133,7 +135,6 @@ async function renderCalendar() {
 const dayDetailModal = document.getElementById('dayDetailModal');
 const dayDetailModalClose = document.getElementById('dayDetailModalClose');
 const dayDetailTitle = document.getElementById('dayDetailTitle');
-const dayDetailUnavailable = document.getElementById('dayDetailUnavailable');
 const dayDetailSlots = document.getElementById('dayDetailSlots');
 
 function openDayDetailModal() {
@@ -151,13 +152,12 @@ dayDetailModal.addEventListener('click', (e) => {
   if (e.target === dayDetailModal) closeDayDetailModal();
 });
 
-async function openDayDetail(dateStr, isUnavailable) {
+async function openDayDetail(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   dayDetailTitle.textContent = new Date(y, m - 1, d).toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   });
 
-  dayDetailUnavailable.hidden = !isUnavailable;
   dayDetailSlots.innerHTML = '<p class="slots-loading">Loading times…</p>';
   openDayDetailModal();
 
