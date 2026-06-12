@@ -1197,33 +1197,56 @@ function renderSectionValue(value) {
   return `<p>${value}</p>`;
 }
 
+let activeOverviewSection = 'Your Information';
+
 function renderOverviewBody() {
   const data = currentPortalData;
   const sections = data.sections || {};
+  const sectionKeys = ['Your Information', ...Object.keys(sections).filter((k) => sections[k])];
 
-  let html = '<div class="portal-section"><h4>Your Information</h4>';
-  for (const [key, label, type] of PROFILE_FIELDS) {
-    const value = data[key] || '';
-    if (!value && !isEditingProfile) continue;
-    if (isEditingProfile) {
-      html += `<div class="portal-booking-row portal-edit-row"><span>${label}</span><input type="${type}" data-field="${key}" value="${escapeAttr(value)}" /></div>`;
-    } else {
-      html += `<div class="portal-booking-row"><span>${label}</span><span>${value}</span></div>`;
+  if (!sectionKeys.includes(activeOverviewSection)) {
+    activeOverviewSection = 'Your Information';
+  }
+  const activeKey = isEditingProfile ? 'Your Information' : activeOverviewSection;
+
+  let tabsHtml = '';
+  if (!isEditingProfile && sectionKeys.length > 1) {
+    tabsHtml = '<div class="overview-sub-tabs">' + sectionKeys.map((key) =>
+      `<button type="button" class="overview-sub-tab${key === activeKey ? ' active' : ''}" data-section="${escapeAttr(key)}">${key}</button>`
+    ).join('') + '</div>';
+  }
+
+  let contentHtml;
+  if (activeKey === 'Your Information') {
+    contentHtml = '<div class="portal-section"><h4>Your Information</h4>';
+    for (const [key, label, type] of PROFILE_FIELDS) {
+      const value = data[key] || '';
+      if (!value && !isEditingProfile) continue;
+      if (isEditingProfile) {
+        contentHtml += `<div class="portal-booking-row portal-edit-row"><span>${label}</span><input type="${type}" data-field="${key}" value="${escapeAttr(value)}" /></div>`;
+      } else {
+        contentHtml += `<div class="portal-booking-row"><span>${label}</span><span>${value}</span></div>`;
+      }
     }
-  }
-  html += '</div>';
-
-  for (const [key, value] of Object.entries(sections)) {
-    if (!value) continue;
-    html += `<div class="portal-section"><h4>${key}</h4>${renderSectionValue(value)}</div>`;
+    contentHtml += '</div>';
+  } else {
+    contentHtml = `<div class="portal-section"><h4>${activeKey}</h4>${renderSectionValue(sections[activeKey])}</div>`;
   }
 
-  portalOverviewBody.innerHTML = html;
+  portalOverviewBody.innerHTML = tabsHtml + contentHtml;
 }
+
+portalOverviewBody.addEventListener('click', (e) => {
+  const btn = e.target.closest('.overview-sub-tab');
+  if (!btn) return;
+  activeOverviewSection = btn.dataset.section;
+  renderOverviewBody();
+});
 
 function renderPortalOverview(data) {
   currentPortalData = data;
   isEditingProfile = false;
+  activeOverviewSection = 'Your Information';
   renderOverviewBody();
   editProfileBtn.hidden = false;
   editProfileActions.hidden = true;
