@@ -30,10 +30,61 @@
         <li><a href="#services">Services</a></li>
         <li><a href="#rates">Rates</a></li>
         <li><a href="#reviews">Reviews</a></li>
-        <li><a href="#book" class="nav-cta">Book Now</a></li>
+        <li class="nav-signin-item">
+          <form id="signInForm" class="signin-form" autocomplete="on">
+            <input type="email" id="signInEmail" placeholder="Email" required autocomplete="email" />
+            <input type="tel" id="signInPhone" placeholder="Phone" required autocomplete="tel" />
+            <button type="submit" class="btn btn-outline signin-btn">Sign In</button>
+          </form>
+          <p id="signInStatus" class="signin-status" hidden></p>
+        </li>
+        <li><a href="#book" class="nav-cta" id="navBookBtn">Book Now</a></li>
       </ul>
     </div>
   </nav>
+
+  <!-- WELCOME BACK MODAL -->
+  <div id="welcomeModal" class="modal-overlay" hidden>
+    <div class="modal-box welcome-modal">
+      <button type="button" class="modal-close" id="welcomeModalClose" aria-label="Close">&times;</button>
+      <h2 id="welcomeTitle" class="welcome-title">Welcome Back!</h2>
+      <p id="welcomeSince" class="welcome-since"></p>
+
+      <div class="client-tabs">
+        <button type="button" class="client-tab active" data-tab="overview">Overview</button>
+        <button type="button" class="client-tab" data-tab="bookings">Past Bookings</button>
+        <button type="button" class="client-tab" data-tab="review">Leave a Review</button>
+      </div>
+
+      <div id="portalTabOverview" class="client-tab-content">
+        <div id="portalOverviewBody"></div>
+      </div>
+
+      <div id="portalTabBookings" class="client-tab-content" hidden>
+        <div id="portalBookingsBody"></div>
+      </div>
+
+      <div id="portalTabReview" class="client-tab-content" hidden>
+        <form id="reviewForm" class="review-form">
+          <label class="review-stars-label">Your Rating</label>
+          <div class="review-stars" id="reviewStars">
+            <span class="review-star" data-value="1">★</span>
+            <span class="review-star" data-value="2">★</span>
+            <span class="review-star" data-value="3">★</span>
+            <span class="review-star" data-value="4">★</span>
+            <span class="review-star" data-value="5">★</span>
+          </div>
+          <input type="hidden" id="reviewRating" name="rating" value="0" />
+          <div class="form-group full">
+            <label for="reviewText">Your Review</label>
+            <textarea id="reviewText" name="text" rows="4" placeholder="Tell us about your experience..." required></textarea>
+          </div>
+          <p id="reviewStatus" class="booking-status" hidden></p>
+          <button type="submit" class="btn btn-primary">Submit Review</button>
+        </form>
+      </div>
+    </div>
+  </div>
 
   <!-- HERO -->
   <header id="home" class="hero">
@@ -49,7 +100,7 @@
       <img src="assets/logo.png" alt="Wags and Whiskers by Misti, LLC — Let us spoil your pets" class="hero-logo" />
       <p class="hero-sub">Pet sitting &amp; care in Kansas City &amp; Gladstone, MO</p>
       <div class="hero-buttons">
-        <a href="#book" class="btn btn-primary">Book a Visit</a>
+        <a href="#book" class="btn btn-primary" id="heroBookBtn">Book a Visit</a>
         <a href="#services" class="btn btn-outline">Our Services</a>
       </div>
     </div>
@@ -134,6 +185,9 @@
     <div class="section-inner">
       <h2 class="section-title reveal">Rates &amp; Pricing</h2>
 
+      <details class="rates-details">
+      <summary class="rates-summary">View Rates &amp; Pricing</summary>
+
       <div class="card-grid rates-grid">
         <div class="rate-card reveal">
           <h3>🏠 Drop-In Visits <span class="rate-card-sub">at your home, near 64119</span></h3>
@@ -165,6 +219,7 @@
       </div>
 
       <p class="about-tagline reveal">We tailor each visit to your pet's needs! 🐾</p>
+      </details>
     </div>
   </section>
 
@@ -204,6 +259,8 @@
           <span class="review-name">— Sara Oltman Sinnett</span>
         </div>
       </div>
+
+      <div class="card-grid reviews-grid" id="siteReviewsGrid"></div>
     </div>
   </section>
 
@@ -212,6 +269,14 @@
     <div class="section-inner">
       <h2 class="section-title">Book a Visit</h2>
       <p class="booking-sub">Fill out the form below and we'll get back to you to confirm details.</p>
+      <button type="button" id="openBookingModalBtn" class="btn btn-primary btn-book-open">Book Now</button>
+    </div>
+  </section>
+
+  <!-- BOOKING MODAL -->
+  <div id="bookingModal" class="modal-overlay" hidden>
+    <div class="modal-box booking-modal-box">
+      <button type="button" class="modal-close" id="bookingModalClose" aria-label="Close">&times;</button>
 
       <div class="calendar-card">
         <div class="calendar-header">
@@ -352,61 +417,66 @@
         </div>
 
         <h3 class="form-section-title">Pet Profile</h3>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="petName">Pet's Name</label>
-            <input type="text" id="petName" name="petName" required />
+        <div id="petProfiles">
+          <div class="pet-profile-block" data-pet-index="1">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="petName">Pet's Name</label>
+                <input type="text" id="petName" name="petName" required />
+              </div>
+              <div class="form-group">
+                <label for="petType">Pet Type</label>
+                <select id="petType" name="petType" required>
+                  <option value="" disabled selected>Select type</option>
+                  <option value="Dog">Dog</option>
+                  <option value="Cat">Cat</option>
+                  <option value="Both">Dog &amp; Cat</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="petBreed">Breed</label>
+                <input type="text" id="petBreed" name="petBreed" required />
+              </div>
+              <div class="form-group">
+                <label for="petAge">Age</label>
+                <input type="text" id="petAge" name="petAge" required />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="petWeight">Weight</label>
+                <input type="text" id="petWeight" name="petWeight" required />
+              </div>
+              <div class="form-group">
+                <label for="petVaccDate">Date of Last Vaccinations</label>
+                <input type="date" id="petVaccDate" name="petVaccDate" required />
+              </div>
+            </div>
+            <div class="form-group full">
+              <label for="feeding">Feeding Instructions</label>
+              <textarea id="feeding" name="feeding" rows="2" required></textarea>
+            </div>
+            <div class="form-group full">
+              <label for="medications">Medications <span class="field-hint">(write "None" if not applicable)</span></label>
+              <textarea id="medications" name="medications" rows="2" required></textarea>
+            </div>
+            <div class="form-group full">
+              <label for="petAllergies">Allergies / Health Concerns <span class="field-hint">(write "None" if not applicable)</span></label>
+              <textarea id="petAllergies" name="petAllergies" rows="2" required></textarea>
+            </div>
+            <div class="form-group full">
+              <label for="petBehavior">Behavior Notes <span class="field-hint">(shy, anxious, aggressive, etc. — write "None" if not applicable)</span></label>
+              <textarea id="petBehavior" name="petBehavior" rows="2" required></textarea>
+            </div>
+            <div class="form-group full">
+              <label for="petFavorites">Favorite Toys / Activities <span class="field-hint">(optional)</span></label>
+              <input type="text" id="petFavorites" name="petFavorites" />
+            </div>
           </div>
-          <div class="form-group">
-            <label for="petType">Pet Type</label>
-            <select id="petType" name="petType" required>
-              <option value="" disabled selected>Select type</option>
-              <option value="Dog">Dog</option>
-              <option value="Cat">Cat</option>
-              <option value="Both">Dog &amp; Cat</option>
-            </select>
-          </div>
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="petBreed">Breed</label>
-            <input type="text" id="petBreed" name="petBreed" required />
-          </div>
-          <div class="form-group">
-            <label for="petAge">Age</label>
-            <input type="text" id="petAge" name="petAge" required />
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="petWeight">Weight</label>
-            <input type="text" id="petWeight" name="petWeight" required />
-          </div>
-          <div class="form-group">
-            <label for="petVaccDate">Date of Last Vaccinations</label>
-            <input type="date" id="petVaccDate" name="petVaccDate" required />
-          </div>
-        </div>
-        <div class="form-group full">
-          <label for="feeding">Feeding Instructions</label>
-          <textarea id="feeding" name="feeding" rows="2" required></textarea>
-        </div>
-        <div class="form-group full">
-          <label for="medications">Medications <span class="field-hint">(write "None" if not applicable)</span></label>
-          <textarea id="medications" name="medications" rows="2" required></textarea>
-        </div>
-        <div class="form-group full">
-          <label for="petAllergies">Allergies / Health Concerns <span class="field-hint">(write "None" if not applicable)</span></label>
-          <textarea id="petAllergies" name="petAllergies" rows="2" required></textarea>
-        </div>
-        <div class="form-group full">
-          <label for="petBehavior">Behavior Notes <span class="field-hint">(shy, anxious, aggressive, etc. — write "None" if not applicable)</span></label>
-          <textarea id="petBehavior" name="petBehavior" rows="2" required></textarea>
-        </div>
-        <div class="form-group full">
-          <label for="petFavorites">Favorite Toys / Activities <span class="field-hint">(optional)</span></label>
-          <input type="text" id="petFavorites" name="petFavorites" />
-        </div>
+        <button type="button" id="addPetBtn" class="btn btn-outline pet-profile-add-btn">+ Add Another Pet</button>
 
         <h3 class="form-section-title">Home Access <span class="field-hint">(for drop-in visits — optional)</span></h3>
         <div class="form-row">
@@ -455,7 +525,7 @@
         <p class="booking-note">This will open your email app with a pre-filled message to <strong>wagsandwhiskersbymistillc@gmail.com</strong>, and open a pre-filled service contract you can print and sign.</p>
       </form>
     </div>
-  </section>
+  </div>
 
   <!-- FOOTER -->
   <footer class="footer">

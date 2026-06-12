@@ -166,6 +166,63 @@ const scheduleFields = document.getElementById('scheduleFields');
 const ongoingScheduleNote = document.getElementById('ongoingScheduleNote');
 const clientTypeRadios = document.querySelectorAll('input[name="clientType"]');
 
+// ── Add Pet Profile (multi-pet bookings) ────────────────────────────────
+const PET_PROFILE_FIELDS = [
+  'petName', 'petType', 'petBreed', 'petAge', 'petWeight', 'petVaccDate',
+  'feeding', 'medications', 'petAllergies', 'petBehavior', 'petFavorites',
+];
+
+const petProfilesContainer = document.getElementById('petProfiles');
+const addPetBtn = document.getElementById('addPetBtn');
+let petProfileCount = 1;
+
+addPetBtn.addEventListener('click', () => {
+  petProfileCount++;
+  const index = petProfileCount;
+  const template = petProfilesContainer.children[0];
+  const block = template.cloneNode(true);
+  block.dataset.petIndex = index;
+
+  block.querySelectorAll('[id]').forEach(el => { el.id = `${el.id}_${index}`; });
+  block.querySelectorAll('label[for]').forEach(label => {
+    label.setAttribute('for', `${label.getAttribute('for')}_${index}`);
+  });
+  block.querySelectorAll('input, textarea, select').forEach(el => {
+    el.name = `${el.name}_${index}`;
+    if (el.tagName === 'SELECT') el.selectedIndex = 0;
+    else el.value = '';
+  });
+
+  const heading = document.createElement('h4');
+  heading.className = 'pet-profile-heading';
+  heading.textContent = `Pet #${index}`;
+  block.insertBefore(heading, block.firstChild);
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'btn btn-outline remove-pet-btn';
+  removeBtn.textContent = 'Remove This Pet';
+  removeBtn.addEventListener('click', () => block.remove());
+  block.appendChild(removeBtn);
+
+  petProfilesContainer.appendChild(block);
+});
+
+// Gathers the additional pet profiles (index 2+) as an array of field
+// objects, for inclusion in the booking payload alongside the primary
+// pet's top-level petName/petType/etc fields.
+function collectAdditionalPets() {
+  const blocks = [...petProfilesContainer.children].slice(1);
+  return blocks.map(block => {
+    const pet = {};
+    for (const field of PET_PROFILE_FIELDS) {
+      const el = block.querySelector(`[name^="${field}_"]`);
+      if (el) pet[field] = el.value;
+    }
+    return pet;
+  });
+}
+
 // Drop-off / pick-up time pickers offer the same 7:00 AM – 9:00 PM,
 // 30-minute slot options as the drop-in time picker.
 function populateTimeOptions(select) {
@@ -629,9 +686,10 @@ function buildContractHtml(d) {
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const blankLine = '<span class="blank-line"></span>';
-  const petType = (d.petType || '').trim();
-  const showDog = !petType || petType === 'Dog' || petType === 'Both';
-  const showCat = !petType || petType === 'Cat' || petType === 'Both';
+
+  let extraPets = [];
+  try { extraPets = JSON.parse(d.pets || '[]'); } catch { extraPets = []; }
+  const allPets = [d, ...(Array.isArray(extraPets) ? extraPets : [])];
 
   const serviceTypeChecks = `${checkbox(isDropIn)} Drop-in &nbsp;&nbsp; ${checkbox(isOvernight)} Overnight &nbsp;&nbsp; ${checkbox(isDayCare)} Daycare &nbsp;&nbsp; ${checkbox(false)} Other: <span class="blank-line"></span>`;
 
@@ -745,8 +803,15 @@ function buildContractHtml(d) {
     <div class="field">Restricted areas? ${checkbox(!!d.restrictedAreas)} Yes &nbsp; ${checkbox(!d.restrictedAreas)} No &nbsp; If yes: ${d.restrictedAreas || blankLine}</div>
   </div>
 
-  ${showDog ? petProfilePage('Dog Profile Sheet (One Per Dog)', "Dog's Name", 'Additional Notes', d) : ''}
-  ${showCat ? petProfilePage('Cat Profile Sheet (One Per Cat)', "Cat's Name", 'Anything Else We Should Know', d) : ''}
+  ${allPets.map(pet => {
+    const petType = (pet.petType || '').trim();
+    const petShowDog = !petType || petType === 'Dog' || petType === 'Both';
+    const petShowCat = !petType || petType === 'Cat' || petType === 'Both';
+    return `
+      ${petShowDog ? petProfilePage('Dog Profile Sheet (One Per Dog)', "Dog's Name", 'Additional Notes', pet) : ''}
+      ${petShowCat ? petProfilePage('Cat Profile Sheet (One Per Cat)', "Cat's Name", 'Anything Else We Should Know', pet) : ''}
+    `;
+  }).join('')}
 
   <div class="page">
     <h2 class="section-h">Cancellation Policy</h2>
@@ -811,6 +876,14 @@ bookingForm.addEventListener('submit', async (e) => {
   const data = new FormData(bookingForm);
   const d = Object.fromEntries(data.entries());
   const ongoing = d.clientType === 'Ongoing';
+
+  const additionalPets = collectAdditionalPets();
+  if (additionalPets.length) d.pets = JSON.stringify(additionalPets);
+  // Drop the raw per-pet field copies (petName_2, petType_2, ...) — they're
+  // already captured in d.pets above.
+  for (const key of Object.keys(d)) {
+    if (/_\d+$/.test(key)) delete d[key];
+  }
 
   if (ongoing) {
     d.startDate = todayISO();
@@ -891,3 +964,251 @@ bookingForm.addEventListener('submit', async (e) => {
 
 // ── Footer year ─────────────────────────────────────────────────────────────
 document.getElementById('year').textContent = new Date().getFullYear();
+
+// ── Booking modal ────────────────────────────────────────────────────────────
+const bookingModal = document.getElementById('bookingModal');
+const openBookingModalBtn = document.getElementById('openBookingModalBtn');
+const bookingModalClose = document.getElementById('bookingModalClose');
+
+function openBookingModal() {
+  bookingModal.hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function closeBookingModal() {
+  bookingModal.hidden = true;
+  document.body.style.overflow = '';
+}
+
+openBookingModalBtn.addEventListener('click', openBookingModal);
+bookingModalClose.addEventListener('click', closeBookingModal);
+bookingModal.addEventListener('click', (e) => {
+  if (e.target === bookingModal) closeBookingModal();
+});
+
+for (const id of ['heroBookBtn', 'navBookBtn']) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      navLinks.classList.remove('open');
+      openBookingModal();
+    });
+  }
+}
+
+// ── Returning-client sign-in / Welcome Back portal ──────────────────────────
+const signInForm = document.getElementById('signInForm');
+const signInStatus = document.getElementById('signInStatus');
+const welcomeModal = document.getElementById('welcomeModal');
+const welcomeModalClose = document.getElementById('welcomeModalClose');
+const welcomeTitle = document.getElementById('welcomeTitle');
+const welcomeSince = document.getElementById('welcomeSince');
+const portalOverviewBody = document.getElementById('portalOverviewBody');
+const portalBookingsBody = document.getElementById('portalBookingsBody');
+
+function openWelcomeModal() {
+  welcomeModal.hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function closeWelcomeModal() {
+  welcomeModal.hidden = true;
+  document.body.style.overflow = '';
+}
+
+welcomeModalClose.addEventListener('click', closeWelcomeModal);
+welcomeModal.addEventListener('click', (e) => {
+  if (e.target === welcomeModal) closeWelcomeModal();
+});
+
+function showSignInStatus(message) {
+  signInStatus.textContent = message;
+  signInStatus.hidden = !message;
+}
+
+function formatClientSince(unixSeconds) {
+  if (!unixSeconds) return '';
+  const since = new Date(unixSeconds * 1000);
+  const now = new Date();
+  let months = (now.getFullYear() - since.getFullYear()) * 12 + (now.getMonth() - since.getMonth());
+  if (now.getDate() < since.getDate()) months--;
+  if (months < 0) months = 0;
+  const years = Math.floor(months / 12);
+  const remMonths = months % 12;
+  const parts = [];
+  if (years) parts.push(`${years} year${years === 1 ? '' : 's'}`);
+  if (remMonths || !years) parts.push(`${remMonths} month${remMonths === 1 ? '' : 's'}`);
+  const dateLabel = since.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  return `Client since ${dateLabel} — that's ${parts.join(', ')}! 🐾`;
+}
+
+function renderPortalOverview(data) {
+  const sections = data.sections || {};
+  const rows = [
+    ['Name', data.ownerName],
+    ['Email', data.ownerEmail],
+    ['Phone', data.ownerPhone],
+    ['Address', data.address],
+    ['Pet(s)', data.petInfo],
+  ];
+  let html = '<div class="portal-section"><h4>Your Information</h4>';
+  for (const [label, value] of rows) {
+    if (!value) continue;
+    html += `<div class="portal-booking-row"><span>${label}</span><span>${value}</span></div>`;
+  }
+  html += '</div>';
+
+  for (const [key, value] of Object.entries(sections)) {
+    if (!value) continue;
+    html += `<div class="portal-section"><h4>${key}</h4><p>${value}</p></div>`;
+  }
+
+  portalOverviewBody.innerHTML = html;
+}
+
+function renderPortalBookings(bookings) {
+  if (!bookings || !bookings.length) {
+    portalBookingsBody.innerHTML = '<p>No past bookings yet.</p>';
+    return;
+  }
+  portalBookingsBody.innerHTML = bookings.map(b => {
+    const dates = b.end_date && b.end_date !== b.start_date
+      ? `${formatDate(b.start_date)} – ${formatDate(b.end_date)}`
+      : formatDate(b.start_date);
+    return `
+      <div class="portal-booking-row">
+        <span><strong>${b.service_type}</strong><br />${dates}</span>
+        <span class="portal-status portal-status-${b.status}">${b.status}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+signInForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('signInEmail').value.trim();
+  const phone = document.getElementById('signInPhone').value.trim();
+  if (!email || !phone) return;
+
+  showSignInStatus('Looking you up...');
+  try {
+    const res = await fetch(`${BOOKING_API}/api/client-portal?email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}`);
+    const data = await res.json();
+    if (!data.found) {
+      showSignInStatus("We couldn't find an account with that email and phone.");
+      return;
+    }
+
+    showSignInStatus('');
+    const firstName = (data.ownerName || '').split(' ')[0] || 'there';
+    welcomeTitle.textContent = `Welcome Back, ${firstName}! 🐾`;
+    welcomeSince.textContent = formatClientSince(data.clientSince);
+
+    renderPortalOverview(data);
+    renderPortalBookings(data.bookings);
+
+    reviewOwnerName = data.ownerName || '';
+    reviewOwnerEmail = data.ownerEmail || '';
+    reviewOwnerPhone = data.ownerPhone || '';
+
+    switchClientTab('overview');
+    openWelcomeModal();
+  } catch {
+    showSignInStatus('Something went wrong — please try again.');
+  }
+});
+
+// ── Welcome modal tabs ───────────────────────────────────────────────────────
+const clientTabs = document.querySelectorAll('.client-tab');
+const clientTabContents = {
+  overview: document.getElementById('portalTabOverview'),
+  bookings: document.getElementById('portalTabBookings'),
+  review: document.getElementById('portalTabReview'),
+};
+
+function switchClientTab(name) {
+  clientTabs.forEach(tab => tab.classList.toggle('active', tab.dataset.tab === name));
+  for (const [key, el] of Object.entries(clientTabContents)) {
+    el.hidden = key !== name;
+  }
+}
+
+clientTabs.forEach(tab => tab.addEventListener('click', () => switchClientTab(tab.dataset.tab)));
+
+// ── Leave a Review ───────────────────────────────────────────────────────────
+let reviewOwnerName = '';
+let reviewOwnerEmail = '';
+let reviewOwnerPhone = '';
+
+const reviewStars = document.querySelectorAll('.review-star');
+const reviewRatingInput = document.getElementById('reviewRating');
+const reviewForm = document.getElementById('reviewForm');
+const reviewStatus = document.getElementById('reviewStatus');
+
+reviewStars.forEach(star => {
+  star.addEventListener('click', () => {
+    const value = Number(star.dataset.value);
+    reviewRatingInput.value = value;
+    reviewStars.forEach(s => s.classList.toggle('selected', Number(s.dataset.value) <= value));
+  });
+});
+
+reviewForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const rating = Number(reviewRatingInput.value);
+  const text = document.getElementById('reviewText').value.trim();
+
+  if (!rating) {
+    reviewStatus.textContent = 'Please select a star rating.';
+    reviewStatus.hidden = false;
+    return;
+  }
+
+  reviewStatus.textContent = 'Submitting...';
+  reviewStatus.hidden = false;
+
+  try {
+    const res = await fetch(`${BOOKING_API}/api/reviews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ownerName: reviewOwnerName,
+        ownerEmail: reviewOwnerEmail,
+        ownerPhone: reviewOwnerPhone,
+        rating,
+        text,
+      }),
+    });
+    if (!res.ok) throw new Error('failed');
+
+    reviewStatus.textContent = "Thank you! Your review has been submitted for approval. 🐾";
+    reviewForm.reset();
+    reviewRatingInput.value = 0;
+    reviewStars.forEach(s => s.classList.remove('selected'));
+  } catch {
+    reviewStatus.textContent = 'Something went wrong submitting your review — please try again.';
+  }
+});
+
+// ── Approved site reviews ────────────────────────────────────────────────────
+async function loadSiteReviews() {
+  const grid = document.getElementById('siteReviewsGrid');
+  if (!grid) return;
+  try {
+    const res = await fetch(`${BOOKING_API}/api/reviews`);
+    if (!res.ok) return;
+    const reviews = await res.json();
+    grid.innerHTML = reviews.map(r => `
+      <div class="review-card reveal in-view">
+        <div class="stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div>
+        <p>"${r.review_text}"</p>
+        <span class="review-name">— ${r.owner_name}</span>
+      </div>
+    `).join('');
+  } catch {
+    // reviews unavailable — leave the static testimonials as-is
+  }
+}
+
+loadSiteReviews();
