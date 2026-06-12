@@ -1,14 +1,5 @@
-// ── Mobile nav toggle ──────────────────────────────────────────────────────
-const navToggle = document.getElementById('navToggle');
+// ── Nav links (now inside hero) ─────────────────────────────────────────────
 const navLinks = document.querySelector('.nav-links');
-
-navToggle.addEventListener('click', () => {
-  navLinks.classList.toggle('open');
-});
-
-document.querySelectorAll('.nav-links a').forEach(link => {
-  link.addEventListener('click', () => navLinks.classList.remove('open'));
-});
 
 // ── Scroll-reveal (3D) ──────────────────────────────────────────────────────
 const revealEls = document.querySelectorAll('.reveal');
@@ -74,14 +65,6 @@ document.querySelectorAll('.tilt-inner').forEach(card => {
     card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale3d(1,1,1)';
   });
 });
-
-// ── Sticky nav shadow on scroll ────────────────────────────────────────────
-const navbar = document.getElementById('navbar');
-window.addEventListener('scroll', () => {
-  navbar.style.boxShadow = window.scrollY > 20
-    ? '0 4px 20px rgba(74,55,40,0.12)'
-    : '0 2px 16px rgba(74,55,40,0.06)';
-}, { passive: true });
 
 // ── Availability calendar ───────────────────────────────────────────────────
 const BOOKING_API = 'https://desktop-rac3kc3.tail27701f.ts.net/wags-booking';

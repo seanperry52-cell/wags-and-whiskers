@@ -14,35 +14,6 @@
 </head>
 <body>
 
-  <!-- NAV -->
-  <nav id="navbar">
-    <div class="nav-inner">
-      <a href="#home" class="nav-logo">
-        <img src="assets/logo-square.png" alt="Wags and Whiskers by Misti, LLC" />
-        <span>Wags &amp; Whiskers</span>
-      </a>
-      <button id="navToggle" aria-label="Toggle menu">
-        <span></span><span></span><span></span>
-      </button>
-      <ul class="nav-links">
-        <li><a href="#home">Home</a></li>
-        <li><a href="#about">About</a></li>
-        <li><a href="#services">Services</a></li>
-        <li><a href="#" id="ratesNavBtn">Rates</a></li>
-        <li><a href="#reviews">Reviews</a></li>
-        <li class="nav-signin-item">
-          <form id="signInForm" class="signin-form" autocomplete="on">
-            <input type="email" id="signInEmail" placeholder="Email" required autocomplete="email" />
-            <input type="tel" id="signInPhone" placeholder="Phone" required autocomplete="tel" />
-            <button type="submit" class="btn btn-outline signin-btn">Sign In</button>
-          </form>
-          <p id="signInStatus" class="signin-status" hidden></p>
-        </li>
-        <li><a href="#" class="nav-cta" id="navBookBtn">Book Now</a></li>
-      </ul>
-    </div>
-  </nav>
-
   <!-- WELCOME BACK MODAL -->
   <div id="welcomeModal" class="modal-overlay" hidden>
     <div class="modal-box welcome-modal">
@@ -99,10 +70,22 @@
     <div class="hero-content">
       <img src="assets/logo.png" alt="Wags and Whiskers by Misti, LLC — Let us spoil your pets" class="hero-logo" />
       <p class="hero-sub">Pet sitting &amp; care in Kansas City &amp; Gladstone, MO</p>
-      <div class="hero-buttons">
-        <a href="#" class="btn btn-primary" id="heroBookBtn">Book a Visit</a>
-        <a href="#services" class="btn btn-outline">Our Services</a>
-      </div>
+      <ul class="nav-links">
+        <li><a href="#home">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#services">Services</a></li>
+        <li><a href="#" id="ratesNavBtn">Rates</a></li>
+        <li><a href="#reviews">Reviews</a></li>
+        <li class="nav-signin-item">
+          <form id="signInForm" class="signin-form" autocomplete="on">
+            <input type="email" id="signInEmail" placeholder="Email" required autocomplete="email" />
+            <input type="tel" id="signInPhone" placeholder="Phone" required autocomplete="tel" />
+            <button type="submit" class="btn btn-outline signin-btn">Sign In</button>
+          </form>
+          <p id="signInStatus" class="signin-status" hidden></p>
+        </li>
+        <li><a href="#" class="nav-cta" id="navBookBtn">Book Now</a></li>
+      </ul>
     </div>
   </header>
 
