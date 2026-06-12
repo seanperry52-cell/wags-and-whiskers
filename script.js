@@ -1290,3 +1290,8 @@ function scrollReviews(direction) {
 
 if (reviewsPrevBtn) reviewsPrevBtn.addEventListener('click', () => scrollReviews(-1));
 if (reviewsNextBtn) reviewsNextBtn.addEventListener('click', () => scrollReviews(1));
+
+// Flip a review card to reveal the full review text on click/tap.
+document.querySelectorAll('.review-card').forEach(card => {
+  card.addEventListener('click', () => card.classList.toggle('flipped'));
+});
