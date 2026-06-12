@@ -988,7 +988,6 @@ function showBookingTab(name) {
   bookingTabContents.forEach(content => {
     content.hidden = content.dataset.bookingTabContent !== name;
   });
-  bookingModal.querySelector('.modal-box').scrollTop = 0;
 }
 
 bookingTabs.forEach(tab => {
