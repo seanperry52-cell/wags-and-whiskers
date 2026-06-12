@@ -1126,7 +1126,8 @@ const welcomeSince = document.getElementById('welcomeSince');
 const portalOverviewBody = document.getElementById('portalOverviewBody');
 const portalBookingsBody = document.getElementById('portalBookingsBody');
 const editProfileBtn = document.getElementById('editProfileBtn');
-const editProfileForm = document.getElementById('editProfileForm');
+const editProfileActions = document.getElementById('editProfileActions');
+const saveProfileBtn = document.getElementById('saveProfileBtn');
 const cancelEditProfileBtn = document.getElementById('cancelEditProfileBtn');
 const editProfileStatus = document.getElementById('editProfileStatus');
 
@@ -1168,31 +1169,65 @@ function formatClientSince(unixSeconds) {
 
 let currentPortalData = null;
 
-function renderPortalOverview(data) {
-  currentPortalData = data;
+const PROFILE_FIELDS = [
+  ['ownerName', 'Name', 'text'],
+  ['ownerEmail', 'Email', 'email'],
+  ['ownerPhone', 'Phone', 'tel'],
+  ['address', 'Address', 'text'],
+  ['petInfo', 'Pet(s)', 'text'],
+];
+
+let isEditingProfile = false;
+
+function escapeAttr(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function renderSectionValue(value) {
+  if (value && typeof value === 'object') {
+    return Object.entries(value)
+      .filter(([, v]) => v)
+      .map(([label, v]) => `<div class="portal-booking-row"><span>${label}</span><span>${v}</span></div>`)
+      .join('');
+  }
+  return `<p>${value}</p>`;
+}
+
+function renderOverviewBody() {
+  const data = currentPortalData;
   const sections = data.sections || {};
-  const rows = [
-    ['Name', data.ownerName],
-    ['Email', data.ownerEmail],
-    ['Phone', data.ownerPhone],
-    ['Address', data.address],
-    ['Pet(s)', data.petInfo],
-  ];
+
   let html = '<div class="portal-section"><h4>Your Information</h4>';
-  for (const [label, value] of rows) {
-    if (!value) continue;
-    html += `<div class="portal-booking-row"><span>${label}</span><span>${value}</span></div>`;
+  for (const [key, label, type] of PROFILE_FIELDS) {
+    const value = data[key] || '';
+    if (!value && !isEditingProfile) continue;
+    if (isEditingProfile) {
+      html += `<div class="portal-booking-row portal-edit-row"><span>${label}</span><input type="${type}" data-field="${key}" value="${escapeAttr(value)}" /></div>`;
+    } else {
+      html += `<div class="portal-booking-row"><span>${label}</span><span>${value}</span></div>`;
+    }
   }
   html += '</div>';
 
   for (const [key, value] of Object.entries(sections)) {
     if (!value) continue;
-    html += `<div class="portal-section"><h4>${key}</h4><p>${value}</p></div>`;
+    html += `<div class="portal-section"><h4>${key}</h4>${renderSectionValue(value)}</div>`;
   }
 
   portalOverviewBody.innerHTML = html;
-  editProfileForm.hidden = true;
+}
+
+function renderPortalOverview(data) {
+  currentPortalData = data;
+  isEditingProfile = false;
+  renderOverviewBody();
   editProfileBtn.hidden = false;
+  editProfileActions.hidden = true;
+  showEditProfileStatus('');
 }
 
 function renderPortalBookings(bookings) {
@@ -1220,33 +1255,28 @@ function showEditProfileStatus(message) {
 
 editProfileBtn.addEventListener('click', () => {
   if (!currentPortalData) return;
-  document.getElementById('editOwnerName').value = currentPortalData.ownerName || '';
-  document.getElementById('editOwnerEmail').value = currentPortalData.ownerEmail || '';
-  document.getElementById('editOwnerPhone').value = currentPortalData.ownerPhone || '';
-  document.getElementById('editAddress').value = currentPortalData.address || '';
-  document.getElementById('editPetInfo').value = currentPortalData.petInfo || '';
+  isEditingProfile = true;
   showEditProfileStatus('');
-  editProfileForm.hidden = false;
+  renderOverviewBody();
   editProfileBtn.hidden = true;
+  editProfileActions.hidden = false;
 });
 
 cancelEditProfileBtn.addEventListener('click', () => {
-  editProfileForm.hidden = true;
+  isEditingProfile = false;
+  showEditProfileStatus('');
+  renderOverviewBody();
   editProfileBtn.hidden = false;
+  editProfileActions.hidden = true;
 });
 
-editProfileForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
+saveProfileBtn.addEventListener('click', async () => {
   if (!currentPortalData) return;
 
-  const updates = {
-    clientId: currentPortalData.clientId,
-    ownerName: document.getElementById('editOwnerName').value.trim(),
-    ownerEmail: document.getElementById('editOwnerEmail').value.trim(),
-    ownerPhone: document.getElementById('editOwnerPhone').value.trim(),
-    address: document.getElementById('editAddress').value.trim(),
-    petInfo: document.getElementById('editPetInfo').value.trim(),
-  };
+  const updates = { clientId: currentPortalData.clientId };
+  portalOverviewBody.querySelectorAll('[data-field]').forEach((input) => {
+    updates[input.dataset.field] = input.value.trim();
+  });
 
   showEditProfileStatus('Saving...');
   try {
@@ -1260,22 +1290,22 @@ editProfileForm.addEventListener('submit', async (e) => {
 
     currentPortalData = {
       ...currentPortalData,
+      ...updates,
       clientId: result.clientId ?? currentPortalData.clientId,
-      ownerName: updates.ownerName,
-      ownerEmail: updates.ownerEmail,
-      ownerPhone: updates.ownerPhone,
-      address: updates.address,
-      petInfo: updates.petInfo,
     };
 
-    reviewOwnerName = updates.ownerName;
-    reviewOwnerEmail = updates.ownerEmail;
-    reviewOwnerPhone = updates.ownerPhone;
+    reviewOwnerName = currentPortalData.ownerName;
+    reviewOwnerEmail = currentPortalData.ownerEmail;
+    reviewOwnerPhone = currentPortalData.ownerPhone;
 
-    const firstName = (updates.ownerName || '').split(' ')[0] || 'there';
+    const firstName = (currentPortalData.ownerName || '').split(' ')[0] || 'there';
     welcomeTitle.textContent = `Welcome Back, ${firstName}! 🐾`;
 
-    renderPortalOverview(currentPortalData);
+    isEditingProfile = false;
+    editProfileBtn.hidden = false;
+    editProfileActions.hidden = true;
+    showEditProfileStatus('');
+    renderOverviewBody();
   } catch {
     showEditProfileStatus('Something went wrong — please try again.');
   }
