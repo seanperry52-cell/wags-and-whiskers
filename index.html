@@ -28,6 +28,7 @@
 
       <div class="client-tabs">
         <button type="button" class="client-tab active" data-tab="overview">Overview</button>
+        <button type="button" class="client-tab" data-tab="book">Book a Visit</button>
         <button type="button" class="client-tab" data-tab="bookings">Past Bookings</button>
         <button type="button" class="client-tab" data-tab="review">Leave a Review</button>
       </div>
@@ -42,6 +43,47 @@
         </div>
         <p id="editProfileStatus" class="booking-status" hidden></p>
         <div id="portalOverviewBody"></div>
+      </div>
+
+      <div id="portalTabBook" class="client-tab-content" hidden>
+        <p class="field-hint">We already have your info on file — just let us know what you need and we'll take care of the rest.</p>
+        <form id="rebookForm" class="rebook-form">
+          <div class="form-group full">
+            <label for="rebookServiceType">Service Type</label>
+            <select id="rebookServiceType" name="serviceType" required>
+              <option value="" disabled selected>Select a service</option>
+              <option value="Drop-In Visit">Drop-In Visit</option>
+              <option value="Overnight Stay">Overnight Stay</option>
+              <option value="Day Care">Day Care</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="rebookStartDate">Start Date</label>
+              <input type="date" id="rebookStartDate" name="startDate" required />
+            </div>
+            <div class="form-group" data-rebook-for="Overnight Stay,Day Care" hidden>
+              <label for="rebookEndDate">End Date</label>
+              <input type="date" id="rebookEndDate" name="endDate" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" data-rebook-for="Drop-In Visit,Overnight Stay,Day Care" hidden>
+              <label for="rebookStartTime">Preferred / Drop-off Time</label>
+              <input type="time" id="rebookStartTime" name="startTime" />
+            </div>
+            <div class="form-group" data-rebook-for="Overnight Stay,Day Care" hidden>
+              <label for="rebookEndTime">Pick-up Time</label>
+              <input type="time" id="rebookEndTime" name="endTime" />
+            </div>
+          </div>
+          <div class="form-group full">
+            <label for="rebookNotes">Anything we should know for this visit?</label>
+            <textarea id="rebookNotes" name="notes" rows="3" placeholder="Optional"></textarea>
+          </div>
+          <p id="rebookStatus" class="booking-status" hidden></p>
+          <button type="submit" class="btn btn-primary">Send Request</button>
+        </form>
       </div>
 
       <div id="portalTabBookings" class="client-tab-content" hidden>

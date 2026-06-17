@@ -1148,6 +1148,73 @@ welcomeModal.addEventListener('click', (e) => {
   if (e.target === welcomeModal) closeWelcomeModal();
 });
 
+// ── "Book a Visit" tab (signed-in portal) ──────────────────────────────────
+// Returning clients are already identified (pet name + phone got them into
+// this modal), so this tab only asks for the new request's service/dates —
+// everything else (owner info, address, pet info, vet/emergency details) is
+// carried over server-side from their saved profile, not re-typed here.
+const rebookForm = document.getElementById('rebookForm');
+const rebookServiceType = document.getElementById('rebookServiceType');
+const rebookStatus = document.getElementById('rebookStatus');
+
+function updateRebookFieldVisibility() {
+  const type = rebookServiceType.value;
+  document.querySelectorAll('[data-rebook-for]').forEach(el => {
+    el.hidden = !el.dataset.rebookFor.split(',').includes(type);
+  });
+}
+rebookServiceType.addEventListener('change', updateRebookFieldVisibility);
+updateRebookFieldVisibility();
+
+function showRebookStatus(message, type) {
+  rebookStatus.textContent = message;
+  rebookStatus.className = `booking-status ${type || ''}`;
+  rebookStatus.hidden = !message;
+}
+
+rebookForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!currentPortalData?.clientId) {
+    showRebookStatus('Something went wrong — please sign in again.', 'error');
+    return;
+  }
+  const data = new FormData(rebookForm);
+  const body = Object.fromEntries(data.entries());
+  showRebookStatus('Sending your request...', '');
+  try {
+    const res = await fetch(`${BOOKING_API}/api/client-portal/${currentPortalData.clientId}/rebook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      showRebookStatus(result.error || 'Something went wrong — please try again.', 'error');
+      return;
+    }
+    showRebookStatus("Request sent! We'll confirm it shortly.", 'success');
+    rebookForm.reset();
+    updateRebookFieldVisibility();
+    // Refresh the Past Bookings tab so the new request shows up immediately.
+    // Some paper-contract clients have no email on file -- fall back to the
+    // same pet-name lookup that got them into this portal in the first place.
+    const phone = currentPortalData.ownerPhone;
+    const lookupQuery = currentPortalData.ownerEmail
+      ? `email=${encodeURIComponent(currentPortalData.ownerEmail)}&phone=${encodeURIComponent(phone)}`
+      : `petName=${encodeURIComponent((currentPortalData.petInfo || '').split(';')[0].split(',')[0].trim())}&phone=${encodeURIComponent(phone)}`;
+    {
+      const res2 = await fetch(`${BOOKING_API}/api/client-portal?${lookupQuery}`);
+      const fresh = await res2.json();
+      if (fresh.found) {
+        currentPortalData.bookings = fresh.bookings;
+        renderPortalBookings(fresh.bookings);
+      }
+    }
+  } catch {
+    showRebookStatus('Something went wrong — please try again.', 'error');
+  }
+});
+
 function showSignInStatus(message) {
   signInStatus.textContent = message;
   signInStatus.hidden = !message;
@@ -1658,6 +1725,7 @@ petSignInForm.addEventListener('submit', async (e) => {
 const clientTabs = document.querySelectorAll('.client-tab');
 const clientTabContents = {
   overview: document.getElementById('portalTabOverview'),
+  book: document.getElementById('portalTabBook'),
   bookings: document.getElementById('portalTabBookings'),
   review: document.getElementById('portalTabReview'),
 };
