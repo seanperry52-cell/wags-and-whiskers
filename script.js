@@ -1154,6 +1154,8 @@ welcomeModal.addEventListener('click', (e) => {
 // everything else (owner info, address, pet info, vet/emergency details) is
 // carried over server-side from their saved profile, not re-typed here.
 const rebookForm = document.getElementById('rebookForm');
+const rebookPetGroup = document.getElementById('rebookPetGroup');
+const rebookPetName = document.getElementById('rebookPetName');
 const rebookServiceType = document.getElementById('rebookServiceType');
 const rebookStatus = document.getElementById('rebookStatus');
 const rebookStartDateInput = document.getElementById('rebookStartDate');
@@ -1252,7 +1254,7 @@ rebookForm.addEventListener('submit', async (e) => {
     showRebookStatus("Request sent! We'll confirm it shortly.", 'success');
     rebookForm.reset();
     updateRebookFieldVisibility();
-    // Refresh the Past Bookings tab so the new request shows up immediately.
+    // Refresh the My Bookings tab so the new request shows up immediately.
     // Some paper-contract clients have no email on file -- fall back to the
     // same pet-name lookup that got them into this portal in the first place.
     const phone = currentPortalData.ownerPhone;
@@ -1549,6 +1551,36 @@ function renderPortalOverview(data) {
   showEditProfileStatus('');
   updateWelcomeAvatar();
   renderOverviewBody();
+  renderRebookPetOptions();
+}
+
+// Best-effort split of a free-text pet_info string into individual pet
+// names, so multi-pet clients can pick which pet a new visit is for.
+// Handles the formats actually on file: "Name (Type, Age), Name2 (...)"
+// and "Name, Type; Name2, Type2". Ambiguous comma-only lists with no
+// parens/semicolons (e.g. older freeform entries) are left as a single
+// pet rather than risk an incorrect split.
+function splitPetNames(petInfo) {
+  const str = String(petInfo || '').trim();
+  if (!str) return [];
+  if (str.includes('(')) {
+    return [...str.matchAll(/([^,()]+?)\s*\([^)]*\)/g)].map((m) => m[1].trim()).filter(Boolean);
+  }
+  if (str.includes(';')) {
+    return str.split(';').map((s) => s.split(',')[0].trim()).filter(Boolean);
+  }
+  return [str.split(',')[0].trim()].filter(Boolean);
+}
+
+function renderRebookPetOptions() {
+  const names = splitPetNames(currentPortalData?.petInfo);
+  if (names.length < 2) {
+    rebookPetGroup.hidden = true;
+    rebookPetName.innerHTML = '';
+    return;
+  }
+  rebookPetName.innerHTML = names.map((n) => `<option value="${escapeAttr(n)}">${n}</option>`).join('');
+  rebookPetGroup.hidden = false;
 }
 
 // Mirrors the published Cancellation Policy on the Forms & Policies page.
@@ -1567,31 +1599,48 @@ function cancellationPolicyInfo(startDateStr) {
 
 const CANCELLABLE_STATUSES = new Set(['pending', 'approved']);
 
+function bookingCardHtml(b) {
+  const dates = b.end_date && b.end_date !== b.start_date
+    ? `${formatDate(b.start_date)} – ${formatDate(b.end_date)}`
+    : formatDate(b.start_date);
+  const cancelUi = CANCELLABLE_STATUSES.has(b.status) ? `
+    <div class="portal-cancel-actions">
+      <button type="button" class="btn btn-outline btn-cancel-reservation" data-booking-id="${b.id}" data-start-date="${b.start_date}">Cancel Reservation</button>
+    </div>
+    <div class="portal-cancel-confirm" data-booking-id="${b.id}" hidden></div>
+  ` : '';
+  return `
+    <div class="portal-booking-card">
+      <div class="portal-booking-row">
+        <span><strong>${b.service_type}</strong><br />${dates}</span>
+        <span class="portal-status portal-status-${b.status}">${b.status}</span>
+      </div>
+      ${cancelUi}
+    </div>
+  `;
+}
+
+// Server already returns every booking on file for the client (no date or
+// status filter) -- this just groups them so upcoming/in-progress visits
+// are clearly separated from history instead of one undifferentiated list.
 function renderPortalBookings(bookings) {
   if (!bookings || !bookings.length) {
-    portalBookingsBody.innerHTML = '<p>No past bookings yet.</p>';
+    portalBookingsBody.innerHTML = '<p>No bookings yet.</p>';
     return;
   }
-  portalBookingsBody.innerHTML = bookings.map(b => {
-    const dates = b.end_date && b.end_date !== b.start_date
-      ? `${formatDate(b.start_date)} – ${formatDate(b.end_date)}`
-      : formatDate(b.start_date);
-    const cancelUi = CANCELLABLE_STATUSES.has(b.status) ? `
-      <div class="portal-cancel-actions">
-        <button type="button" class="btn btn-outline btn-cancel-reservation" data-booking-id="${b.id}" data-start-date="${b.start_date}">Cancel Reservation</button>
-      </div>
-      <div class="portal-cancel-confirm" data-booking-id="${b.id}" hidden></div>
-    ` : '';
-    return `
-      <div class="portal-booking-card">
-        <div class="portal-booking-row">
-          <span><strong>${b.service_type}</strong><br />${dates}</span>
-          <span class="portal-status portal-status-${b.status}">${b.status}</span>
-        </div>
-        ${cancelUi}
-      </div>
-    `;
-  }).join('');
+  const today = new Date().toISOString().slice(0, 10);
+  const isUpcoming = (b) => (b.end_date || b.start_date) >= today;
+  const upcoming = bookings.filter(isUpcoming).sort((a, b) => a.start_date.localeCompare(b.start_date));
+  const past = bookings.filter((b) => !isUpcoming(b)).sort((a, b) => b.start_date.localeCompare(a.start_date));
+
+  let html = '';
+  if (upcoming.length) {
+    html += '<h4 class="portal-bookings-heading">Upcoming &amp; Current</h4>' + upcoming.map(bookingCardHtml).join('');
+  }
+  if (past.length) {
+    html += '<h4 class="portal-bookings-heading">Past</h4>' + past.map(bookingCardHtml).join('');
+  }
+  portalBookingsBody.innerHTML = html;
 }
 
 portalBookingsBody.addEventListener('click', async (e) => {

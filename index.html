@@ -29,11 +29,13 @@
       <div class="client-tabs">
         <button type="button" class="client-tab active" data-tab="overview">Overview</button>
         <button type="button" class="client-tab" data-tab="book">Book a Visit</button>
-        <button type="button" class="client-tab" data-tab="bookings">Past Bookings</button>
+        <button type="button" class="client-tab" data-tab="bookings">Bookings</button>
         <button type="button" class="client-tab" data-tab="review">Leave a Review</button>
       </div>
 
       <div id="portalTabOverview" class="client-tab-content">
+        <div id="portalOverviewBody"></div>
+        <p id="editProfileStatus" class="booking-status" hidden></p>
         <div class="portal-edit-bar">
           <button type="button" id="editProfileBtn" class="btn btn-outline">Edit Profile</button>
           <div id="editProfileActions" class="profile-edit-actions" hidden>
@@ -41,13 +43,15 @@
             <button type="button" id="cancelEditProfileBtn" class="btn btn-outline">Cancel</button>
           </div>
         </div>
-        <p id="editProfileStatus" class="booking-status" hidden></p>
-        <div id="portalOverviewBody"></div>
       </div>
 
       <div id="portalTabBook" class="client-tab-content" hidden>
         <p class="field-hint">We already have your info on file — just let us know what you need and we'll take care of the rest.</p>
         <form id="rebookForm" class="rebook-form">
+          <div class="form-group full" id="rebookPetGroup" hidden>
+            <label for="rebookPetName">Which pet is this for?</label>
+            <select id="rebookPetName" name="petName"></select>
+          </div>
           <div class="form-group full">
             <label for="rebookServiceType">Service Type</label>
             <select id="rebookServiceType" name="serviceType" required>
