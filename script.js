@@ -1156,14 +1156,64 @@ welcomeModal.addEventListener('click', (e) => {
 const rebookForm = document.getElementById('rebookForm');
 const rebookServiceType = document.getElementById('rebookServiceType');
 const rebookStatus = document.getElementById('rebookStatus');
+const rebookStartDateInput = document.getElementById('rebookStartDate');
+const rebookDropinSlots = document.getElementById('rebookDropinSlots');
+
+// Same idea as the main booking form's slot picker (selectedSlots above) --
+// a drop-in visit can cover more than one check-in on the same day.
+let selectedRebookSlots = new Set();
+
+async function renderRebookTimeSlots() {
+  const date = rebookStartDateInput.value;
+  if (!date) {
+    rebookDropinSlots.innerHTML = '<p class="slots-loading">Pick a date above to see open times.</p>';
+    return;
+  }
+  rebookDropinSlots.innerHTML = '<p class="slots-loading">Loading times…</p>';
+  try {
+    const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${date}`);
+    if (!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    rebookDropinSlots.innerHTML = '';
+    (data.slots || []).forEach(s => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `slot-btn ${s.available ? 'slot-available' : 'slot-booked'}`;
+      btn.textContent = formatTime(s.time);
+      btn.disabled = !s.available;
+      if (selectedRebookSlots.has(s.time)) btn.classList.add('slot-selected');
+      btn.addEventListener('click', () => {
+        if (selectedRebookSlots.has(s.time)) {
+          selectedRebookSlots.delete(s.time);
+          btn.classList.remove('slot-selected');
+        } else {
+          selectedRebookSlots.add(s.time);
+          btn.classList.add('slot-selected');
+        }
+      });
+      rebookDropinSlots.appendChild(btn);
+    });
+  } catch {
+    rebookDropinSlots.innerHTML = '<p class="slots-error">Could not load times — please try again.</p>';
+  }
+}
 
 function updateRebookFieldVisibility() {
   const type = rebookServiceType.value;
   document.querySelectorAll('[data-rebook-for]').forEach(el => {
     el.hidden = !el.dataset.rebookFor.split(',').includes(type);
   });
+  if (type === 'Drop-In Visit') {
+    renderRebookTimeSlots();
+  } else {
+    selectedRebookSlots.clear();
+    rebookDropinSlots.innerHTML = '';
+  }
 }
 rebookServiceType.addEventListener('change', updateRebookFieldVisibility);
+rebookStartDateInput.addEventListener('change', () => {
+  if (rebookServiceType.value === 'Drop-In Visit') renderRebookTimeSlots();
+});
 updateRebookFieldVisibility();
 
 function showRebookStatus(message, type) {
@@ -1180,6 +1230,13 @@ rebookForm.addEventListener('submit', async (e) => {
   }
   const data = new FormData(rebookForm);
   const body = Object.fromEntries(data.entries());
+  if (body.serviceType === 'Drop-In Visit') {
+    if (selectedRebookSlots.size === 0) {
+      showRebookStatus('Please choose at least one available time.', 'error');
+      return;
+    }
+    body.startTime = [...selectedRebookSlots].sort().join(',');
+  }
   showRebookStatus('Sending your request...', '');
   try {
     const res = await fetch(`${BOOKING_API}/api/client-portal/${currentPortalData.clientId}/rebook`, {
