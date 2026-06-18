@@ -76,6 +76,22 @@ function ymd(year, month, day) {
 const calMonth = new Date();
 calMonth.setDate(1);
 
+// Tracks which day the client has actually picked on the calendar, so it
+// can be highlighted and so re-renders (e.g. switching service type) don't
+// lose the selection.
+let selectedCalendarDate = null;
+
+// Clicking an available day sets the real startDate field and re-runs its
+// change handler, which is what actually loads/refreshes the drop-in time
+// slots below -- the calendar is the picker, not a separate read-only view.
+function selectCalendarDate(dateStr) {
+  selectedCalendarDate = dateStr;
+  startDateInput.value = dateStr;
+  startDateInput.dispatchEvent(new Event('change'));
+  renderCalendar();
+  document.getElementById('scheduleFields').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 async function renderCalendar() {
   const calEl = document.getElementById('availabilityCalendar');
   const monthLabel = document.getElementById('calMonthLabel');
@@ -123,59 +139,12 @@ async function renderCalendar() {
     const unavailableForService = blockedSet.has(dateStr) || (bookedSet.has(dateStr) && !isDropIn);
     if (unavailableForService) cell.classList.add('cal-unavailable');
     else cell.classList.add('cal-available');
+    if (dateStr === selectedCalendarDate) cell.classList.add('cal-selected');
     cell.textContent = day;
     if (!unavailableForService) {
-      cell.addEventListener('click', () => openDayDetail(dateStr));
+      cell.addEventListener('click', () => selectCalendarDate(dateStr));
     }
     calEl.appendChild(cell);
-  }
-}
-
-// ── Day detail modal ────────────────────────────────────────────────────────
-const dayDetailModal = document.getElementById('dayDetailModal');
-const dayDetailModalClose = document.getElementById('dayDetailModalClose');
-const dayDetailTitle = document.getElementById('dayDetailTitle');
-const dayDetailSlots = document.getElementById('dayDetailSlots');
-
-function openDayDetailModal() {
-  dayDetailModal.hidden = false;
-  document.body.style.overflow = 'hidden';
-}
-
-function closeDayDetailModal() {
-  dayDetailModal.hidden = true;
-  document.body.style.overflow = '';
-}
-
-dayDetailModalClose.addEventListener('click', closeDayDetailModal);
-dayDetailModal.addEventListener('click', (e) => {
-  if (e.target === dayDetailModal) closeDayDetailModal();
-});
-
-async function openDayDetail(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  dayDetailTitle.textContent = new Date(y, m - 1, d).toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
-  });
-
-  dayDetailSlots.innerHTML = '<p class="slots-loading">Loading times…</p>';
-  openDayDetailModal();
-
-  try {
-    const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${dateStr}`);
-    if (!res.ok) throw new Error('bad response');
-    const data = await res.json();
-    dayDetailSlots.innerHTML = '';
-    (data.slots || []).forEach(s => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `slot-btn ${s.available ? 'slot-available' : 'slot-booked'}`;
-      btn.textContent = formatTime(s.time);
-      btn.disabled = true;
-      dayDetailSlots.appendChild(btn);
-    });
-  } catch (err) {
-    dayDetailSlots.innerHTML = '<p class="slots-error">Could not load times — please try again.</p>';
   }
 }
 
@@ -461,6 +430,15 @@ const OVERNIGHT_PUPPY_RATE = 50;
 const OVERNIGHT_OVER_24H_FEE = 20;
 const MAX_SERVICE_MILES = 10;
 
+// "Additional Dog" line items from the Rates & Pricing table -- each extra
+// pet beyond the first adds this flat amount per night/day/visit on top of
+// the base per-service rate (e.g. Overnight: $45 + $30 = $75 for 2 dogs).
+const ADDITIONAL_DOG_ADDON = {
+  'Overnight Stay': 30,
+  'Day Care': 25,
+  'Drop-In Visit': 8,
+};
+
 // Pet Profile "Age" is free text (e.g. "8 weeks", "5 months", "2", "3 years") —
 // treat anything under 1 year old as a puppy/kitten for pricing.
 function isPuppyAge(ageText) {
@@ -680,6 +658,17 @@ function buildContractHtml(d) {
   const dropInTimes = isDropIn ? String(d.startTime || '').split(',').map(t => t.trim()).filter(Boolean) : [];
   const visitCount = isDropIn ? Math.max(dropInTimes.length, 1) : 1;
 
+  // Pet profiles 2+ (collected on the booking form) each add a flat
+  // "Additional Dog" charge on top of the per-night/day/visit base rate.
+  let additionalPetsForPricing = [];
+  try { additionalPetsForPricing = JSON.parse(d.pets || '[]'); } catch { additionalPetsForPricing = []; }
+  if (!Array.isArray(additionalPetsForPricing)) additionalPetsForPricing = [];
+  const additionalDogCount = additionalPetsForPricing.length;
+  const additionalDogAddon = (ADDITIONAL_DOG_ADDON[serviceType] ?? 0) * additionalDogCount;
+  const additionalDogNote = additionalDogCount
+    ? ` + $${(ADDITIONAL_DOG_ADDON[serviceType] ?? 0).toFixed(2)} x ${additionalDogCount} additional dog${additionalDogCount > 1 ? 's' : ''}`
+    : '';
+
   const nights = nightsBetween(d.startDate, d.endDate);
   const isPuppy = isPuppyAge(d.petAge);
   let rate = RATE_INFO[serviceType]?.rate ?? 0;
@@ -696,6 +685,8 @@ function buildContractHtml(d) {
       rate = OVERNIGHT_PUPPY_RATE;
       unit = 'per night (puppy)';
     }
+    rate += additionalDogAddon;
+    unit += additionalDogNote;
     const over24Fee = overnightExtraHours(d, nights) > 0 ? OVERNIGHT_OVER_24H_FEE : 0;
     dailyTotal = `$${rate.toFixed(2)}`;
     visitTotal = `$${(rate * nights + over24Fee).toFixed(2)}`;
@@ -705,6 +696,8 @@ function buildContractHtml(d) {
       rate = 45;
       unit = 'per day (puppy)';
     }
+    rate += additionalDogAddon;
+    unit += additionalDogNote;
     const days = (d.endDate && d.endDate !== d.startDate) ? nights + 1 : 1;
     dailyTotal = `$${rate.toFixed(2)}`;
     visitTotal = `$${(rate * days).toFixed(2)}`;
@@ -714,8 +707,8 @@ function buildContractHtml(d) {
     const totalVisits = visitCount * daySpan;
     const extended = totalVisits >= 14;
     const rates = extended ? DROP_IN_EXTENDED_RATES : DROP_IN_RATES;
-    rate = (isFar ? rates.far : rates.near) + (isPuppy ? PUPPY_ADDON : 0);
-    unit = `per visit (30 min, ${isFar ? '5+' : 'under 5'} mi from Misti's home${extended ? ', extended rate (14+ visits in this request)' : ''}${isPuppy ? ' + puppy add-on' : ''})`;
+    rate = (isFar ? rates.far : rates.near) + (isPuppy ? PUPPY_ADDON : 0) + additionalDogAddon;
+    unit = `per visit (30 min, ${isFar ? '5+' : 'under 5'} mi from Misti's home${extended ? ', extended rate (14+ visits in this request)' : ''}${isPuppy ? ' + puppy add-on' : ''})${additionalDogNote}`;
     dailyTotal = daySpan > 1 ? `$${(rate * visitCount).toFixed(2)}` : '';
     visitTotal = `$${(rate * totalVisits).toFixed(2)}`;
   }
@@ -730,9 +723,7 @@ function buildContractHtml(d) {
 
   const blankLine = '<span class="blank-line"></span>';
 
-  let extraPets = [];
-  try { extraPets = JSON.parse(d.pets || '[]'); } catch { extraPets = []; }
-  const allPets = [d, ...(Array.isArray(extraPets) ? extraPets : [])];
+  const allPets = [d, ...additionalPetsForPricing];
 
   const serviceTypeChecks = `${checkbox(isDropIn)} Drop-in &nbsp;&nbsp; ${checkbox(isOvernight)} Overnight &nbsp;&nbsp; ${checkbox(isDayCare)} Daycare &nbsp;&nbsp; ${checkbox(false)} Other: <span class="blank-line"></span>`;
 
@@ -992,7 +983,7 @@ bookingForm.addEventListener('submit', async (e) => {
     `Booking Type: ${d.clientType === 'Ongoing' ? 'Ongoing / recurring (schedule based on availability)' : 'One-time'}`,
     `${d.clientType === 'Ongoing' ? 'Preferred First Date' : 'Start Date'}: ${d.startDate}`,
     `End Date: ${d.endDate || 'N/A'}`,
-    `Preferred Time: ${d.startTime || 'N/A'}`,
+    `Preferred Time: ${d.startTime ? (DROP_IN_SERVICES.has(d.serviceType) ? formatTimesList(d.startTime) : formatTime(d.startTime)) : 'N/A'}`,
     `Pet(s) Info: ${d.petInfo}`,
     `Address: ${d.address}`,
     `Notes: ${d.notes || 'N/A'}`,
@@ -1143,10 +1134,10 @@ function closeWelcomeModal() {
   document.body.style.overflow = '';
 }
 
+// Unlike other modals, this one only closes via its explicit close button --
+// clients can have unsaved profile edits or an in-progress rebook request
+// open, so an accidental backdrop click shouldn't lose that.
 welcomeModalClose.addEventListener('click', closeWelcomeModal);
-welcomeModal.addEventListener('click', (e) => {
-  if (e.target === welcomeModal) closeWelcomeModal();
-});
 
 // ── "Book a Visit" tab (signed-in portal) ──────────────────────────────────
 // Returning clients are already identified (pet name + phone got them into

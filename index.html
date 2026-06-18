@@ -138,8 +138,8 @@
       <button type="button" class="modal-close" id="petSignInModalClose" aria-label="Close">&times;</button>
       <h2 class="welcome-title">Sign In</h2>
       <form id="petSignInForm" class="signin-form signin-form-modal" autocomplete="on">
-        <input type="text" id="signInPetName" placeholder="Pet Name" required autocomplete="off" />
-        <input type="tel" id="signInPhone" placeholder="Phone" required autocomplete="tel" />
+        <input type="text" id="signInPetName" placeholder="Pet Name" required autocomplete="off" enterkeyhint="go" />
+        <input type="tel" id="signInPhone" placeholder="Phone" required autocomplete="tel" enterkeyhint="go" />
         <button type="submit" class="btn btn-primary signin-btn">Sign In</button>
       </form>
       <p id="petSignInStatus" class="signin-status" hidden></p>
@@ -317,6 +317,7 @@
           <div class="rate-row"><span>30 min &middot; 5+ mi</span><span>$18</span></div>
           <div class="rate-row"><span>60 min &middot; under 5 mi</span><span>$26</span></div>
           <div class="rate-row"><span>60 min &middot; 5+ mi</span><span>$28</span></div>
+          <div class="rate-row"><span>Additional dog</span><span>+$8</span></div>
           <div class="rate-row"><span>Puppy add-on</span><span>+$4</span></div>
           <div class="rate-row"><span>Extended (14+ visits) 30 min &middot; under 5 mi</span><span>$15</span></div>
           <div class="rate-row"><span>Extended (14+ visits) 30 min &middot; 5+ mi</span><span>$17</span></div>
@@ -341,15 +342,6 @@
       </div>
 
       <p class="about-tagline">We tailor each visit to your pet's needs! 🐾</p>
-    </div>
-  </div>
-
-  <!-- DAY DETAIL MODAL -->
-  <div id="dayDetailModal" class="modal-overlay" hidden>
-    <div class="modal-box day-detail-modal-box">
-      <button type="button" class="modal-close" id="dayDetailModalClose" aria-label="Close">&times;</button>
-      <h2 id="dayDetailTitle" class="section-title"></h2>
-      <div id="dayDetailSlots" class="dropin-slots"></div>
     </div>
   </div>
 
