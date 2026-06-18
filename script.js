@@ -1244,6 +1244,11 @@ let currentPortalData = null;
 // a drop-in visit can cover more than one check-in on the same day.
 let selectedRebookSlots = new Set();
 
+// Which pet(s) this rebook request is for -- a multi-pet household can pick
+// either pet alone or both together. Defaults to all pets (the whole
+// household) each time the selector is (re)rendered.
+let selectedRebookPets = new Set();
+
 // Some clients (set by Misti via the admin client directory's "Drop-In
 // Presets" tab) have a handful of usual drop-in times -- show those as
 // one-tap quick-select buttons above the full slot grid so picking them
@@ -1354,6 +1359,14 @@ rebookForm.addEventListener('submit', async (e) => {
   }
   const data = new FormData(rebookForm);
   const body = Object.fromEntries(data.entries());
+  // Only send petNames when it's a strict subset of the household (one pet,
+  // or some-but-not-all of a larger household) -- selecting all of them is
+  // the same as not filtering at all, which is what the server already does
+  // by default for a whole-household visit.
+  const allPetNames = splitPetNames(currentPortalData?.petInfo);
+  if (!rebookPetGroup.hidden && selectedRebookPets.size < allPetNames.length) {
+    body.petNames = [...selectedRebookPets].join(',');
+  }
   let requestDates = [body.startDate];
   if (body.serviceType === 'Drop-In Visit') {
     if (selectedRebookSlots.size === 0) {
@@ -1695,11 +1708,11 @@ function renderPortalOverview(data) {
 }
 
 // Best-effort split of a free-text pet_info string into individual pet
-// names, so multi-pet clients can pick which pet a new visit is for.
-// Handles the formats actually on file: "Name (Type, Age), Name2 (...)"
-// and "Name, Type; Name2, Type2". Ambiguous comma-only lists with no
-// parens/semicolons (e.g. older freeform entries) are left as a single
-// pet rather than risk an incorrect split.
+// names, so multi-pet clients can pick which pet(s) a new visit is for.
+// Handles "Name (Type, Age), Name2 (...)", "Name, Type; Name2, Type2", and
+// plain "Name1 and Name2, Type" where the name field itself joins multiple
+// pets with "and"/"&" (e.g. "Leo and Lainey, dogs" or "Sadie & Ellie, Pug &
+// Puggle, ...") -- common enough in freeform-entered records to split on.
 function splitPetNames(petInfo) {
   const str = String(petInfo || '').trim();
   if (!str) return [];
@@ -1709,23 +1722,38 @@ function splitPetNames(petInfo) {
   if (str.includes(';')) {
     return str.split(';').map((s) => s.split(',')[0].trim()).filter(Boolean);
   }
-  // No parens/semicolons -- the first comma-segment is the name field, but
-  // it may itself join multiple pets with "and"/"&" (e.g. "Leo and Lainey,
-  // dogs" or "Sadie & Ellie, Pug & Puggle, ..."), which is common enough in
-  // freeform-entered records that it is worth splitting on.
   const nameField = str.split(',')[0].trim();
-  const names = nameField.split(/s+(?:and|&)s+/i).map((n) => n.trim()).filter(Boolean);
+  const names = nameField.split(/\s+(?:and|&)\s+/i).map((n) => n.trim()).filter(Boolean);
   return names.length ? names : [str].filter(Boolean);
 }
 
+// Multi-pet households can request a visit for either pet alone or both
+// together -- toggle buttons (same pattern as the time-slot picker) default
+// to all pets selected (the whole household).
 function renderRebookPetOptions() {
   const names = splitPetNames(currentPortalData?.petInfo);
   if (names.length < 2) {
     rebookPetGroup.hidden = true;
     rebookPetName.innerHTML = '';
+    selectedRebookPets = new Set();
     return;
   }
-  rebookPetName.innerHTML = names.map((n) => `<option value="${escapeAttr(n)}">${n}</option>`).join('');
+  if (selectedRebookPets.size === 0) selectedRebookPets = new Set(names);
+  rebookPetName.innerHTML = '';
+  names.forEach((name) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `slot-btn ${selectedRebookPets.has(name) ? 'slot-selected' : 'slot-available'}`;
+    btn.textContent = name;
+    btn.addEventListener('click', () => {
+      if (selectedRebookPets.has(name)) selectedRebookPets.delete(name);
+      else selectedRebookPets.add(name);
+      // Never let it drop to zero pets selected -- that's not a valid choice.
+      if (selectedRebookPets.size === 0) selectedRebookPets.add(name);
+      renderRebookPetOptions();
+    });
+    rebookPetName.appendChild(btn);
+  });
   rebookPetGroup.hidden = false;
 }
 
