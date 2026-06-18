@@ -180,6 +180,9 @@ const endTimeGroup = document.getElementById('endTimeGroup');
 const endTimeInput = document.getElementById('endTime');
 const dropinSlotsGroup = document.getElementById('dropinSlotsGroup');
 const dropinSlots = document.getElementById('dropinSlots');
+const dropinExtraDatesGroup = document.getElementById('dropinExtraDatesGroup');
+const dropinExtraDates = document.getElementById('dropinExtraDates');
+const addDropinDateBtn = document.getElementById('addDropinDateBtn');
 const endDateInput = document.getElementById('endDate');
 const endDateGroup = document.getElementById('endDateGroup');
 const scheduleFields = document.getElementById('scheduleFields');
@@ -242,6 +245,32 @@ function collectAdditionalPets() {
     return pet;
   });
 }
+
+// A drop-in visit can be requested for several (not necessarily
+// contiguous) dates at once, e.g. Mon/Wed/Fri with the same times each
+// day -- each "+ Add Another Date" row is its own plain date input;
+// there's no separate Set to keep in sync, just read the DOM at submit time.
+function collectDropinExtraDates() {
+  return [...dropinExtraDates.querySelectorAll('input[type="date"]')]
+    .map((el) => el.value)
+    .filter(Boolean);
+}
+
+function addDropinDateRow() {
+  const row = document.createElement('div');
+  row.className = 'dropin-extra-date-row';
+  const input = document.createElement('input');
+  input.type = 'date';
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'btn btn-outline';
+  removeBtn.textContent = 'Remove';
+  removeBtn.addEventListener('click', () => row.remove());
+  row.appendChild(input);
+  row.appendChild(removeBtn);
+  dropinExtraDates.appendChild(row);
+}
+addDropinDateBtn.addEventListener('click', addDropinDateRow);
 
 // Drop-off / pick-up time pickers offer the same 7:00 AM – 9:00 PM,
 // 30-minute slot options as the drop-in time picker.
@@ -319,6 +348,8 @@ function updateTimeFields() {
     endTimeGroup.hidden = false;
     dropinSlotsGroup.hidden = true;
     dropinSlots.innerHTML = '';
+    dropinExtraDatesGroup.hidden = true;
+    dropinExtraDates.innerHTML = '';
   } else if (isDropIn) {
     startTimeGroup.hidden = true;
     endTimeGroup.hidden = true;
@@ -326,6 +357,7 @@ function updateTimeFields() {
     dropinSlotsGroup.hidden = false;
     selectedSlots.clear();
     renderTimeSlots();
+    dropinExtraDatesGroup.hidden = false;
   } else {
     startTimeGroup.hidden = false;
     startTimeLabel.textContent = 'Preferred Time';
@@ -333,6 +365,8 @@ function updateTimeFields() {
     endTimeInput.value = '';
     dropinSlotsGroup.hidden = true;
     dropinSlots.innerHTML = '';
+    dropinExtraDatesGroup.hidden = true;
+    dropinExtraDates.innerHTML = '';
   }
 }
 
@@ -689,10 +723,14 @@ function buildContractHtml(d) {
 
   // Pet profiles 2+ (collected on the booking form) each add a flat
   // "Additional Dog" charge on top of the per-night/day/visit base rate.
+  // Some bookings (e.g. a signed-in client's lightweight rebook request)
+  // never collect explicit per-pet profile blocks at all, so also fall
+  // back to counting names in the plain petInfo text (e.g. "Leo and
+  // Lainey, dogs") and use whichever signal indicates more dogs.
   let additionalPetsForPricing = [];
   try { additionalPetsForPricing = JSON.parse(d.pets || '[]'); } catch { additionalPetsForPricing = []; }
   if (!Array.isArray(additionalPetsForPricing)) additionalPetsForPricing = [];
-  const additionalDogCount = additionalPetsForPricing.length;
+  const additionalDogCount = Math.max(additionalPetsForPricing.length, splitPetNames(d.petInfo).length - 1);
   const additionalDogAddon = (ADDITIONAL_DOG_ADDON[serviceType] ?? 0) * additionalDogCount;
   const additionalDogNote = additionalDogCount
     ? ` + $${(ADDITIONAL_DOG_ADDON[serviceType] ?? 0).toFixed(2)} x ${additionalDogCount} additional dog${additionalDogCount > 1 ? 's' : ''}`
@@ -957,6 +995,7 @@ bookingForm.addEventListener('submit', async (e) => {
     if (/_\d+$/.test(key)) delete d[key];
   }
 
+  let extraDropinDates = [];
   if (ongoing) {
     d.endDate = '';
     d.startTime = '';
@@ -966,31 +1005,43 @@ bookingForm.addEventListener('submit', async (e) => {
       return;
     }
     d.startTime = [...selectedSlots].sort().join(',');
+    extraDropinDates = collectDropinExtraDates();
   }
 
-  // Reserve the request with the booking system first — for overnight/day
+  // A multi-date drop-in request (the primary date plus any "Other Dates")
+  // becomes one booking per date, all with the same requested times --
+  // there's no single-booking concept of a non-contiguous set of dates,
+  // so each date is its own independent request/approval.
+  const requestDates = extraDropinDates.length ? [d.startDate, ...extraDropinDates] : [d.startDate];
+  const dateResults = [];
+
+  // Reserve the request(s) with the booking system first — for overnight/day
   // care this checks the dates are still available before we proceed.
   try {
-    const res = await fetch(`${BOOKING_API}/api/bookings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(d),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      showBookingStatus(err.error || 'Something went wrong submitting your request. Please try again.', 'error');
-      return;
-    }
-    const { id: bookingId } = await res.json();
+    for (const requestDate of requestDates) {
+      const body = { ...d, startDate: requestDate };
+      const res = await fetch(`${BOOKING_API}/api/bookings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        dateResults.push({ date: requestDate, ok: false, error: err.error || 'Something went wrong.' });
+        continue;
+      }
+      const { id: bookingId } = await res.json();
+      dateResults.push({ date: requestDate, ok: true, bookingId });
 
-    const photoFiles = document.getElementById('petPhotos').files;
-    if (bookingId && photoFiles.length > 0) {
-      const photoData = new FormData();
-      for (const file of photoFiles) photoData.append('photos', file);
-      try {
-        await fetch(`${BOOKING_API}/api/bookings/${bookingId}/photos`, { method: 'POST', body: photoData });
-      } catch (err) {
-        // photo upload failure shouldn't block the booking request
+      const photoFiles = document.getElementById('petPhotos').files;
+      if (bookingId && photoFiles.length > 0) {
+        const photoData = new FormData();
+        for (const file of photoFiles) photoData.append('photos', file);
+        try {
+          await fetch(`${BOOKING_API}/api/bookings/${bookingId}/photos`, { method: 'POST', body: photoData });
+        } catch (err) {
+          // photo upload failure shouldn't block the booking request
+        }
       }
     }
 
@@ -1012,6 +1063,7 @@ bookingForm.addEventListener('submit', async (e) => {
     `Booking Type: ${d.clientType === 'Ongoing' ? 'Ongoing / recurring (schedule based on availability)' : 'One-time'}`,
     `${d.clientType === 'Ongoing' ? 'Preferred First Date' : 'Start Date'}: ${d.startDate}`,
     `End Date: ${d.endDate || 'N/A'}`,
+    ...(requestDates.length > 1 ? [`Other Dates Requested: ${requestDates.slice(1).join(', ')}`] : []),
     `Preferred Time: ${d.startTime ? (DROP_IN_SERVICES.has(d.serviceType) ? formatTimesList(d.startTime) : formatTime(d.startTime)) : 'N/A'}`,
     `Pet(s) Info: ${d.petInfo}`,
     `Address: ${d.address}`,
@@ -1030,7 +1082,12 @@ bookingForm.addEventListener('submit', async (e) => {
     contractWin.document.close();
   }
 
-  showBookingStatus('Request received! Opening your email and contract now...', 'success');
+  const failedDates = dateResults.filter((r) => !r.ok);
+  const statusMessage = failedDates.length
+    ? `Request sent for ${dateResults.length - failedDates.length} of ${dateResults.length} date(s). ` +
+      `Couldn't book: ${failedDates.map((f) => `${formatDate(f.date)} (${f.error})`).join('; ')}. Opening your email and contract now...`
+    : 'Request received! Opening your email and contract now...';
+  showBookingStatus(statusMessage, failedDates.length === dateResults.length ? 'error' : 'success');
   window.location.href = mailtoLink;
 });
 
@@ -1179,9 +1236,41 @@ const rebookPetName = document.getElementById('rebookPetName');
 const rebookServiceType = document.getElementById('rebookServiceType');
 const rebookStatus = document.getElementById('rebookStatus');
 const rebookStartDateInput = document.getElementById('rebookStartDate');
+const rebookEndDateInput = document.getElementById('rebookEndDate');
 const rebookDropinSlots = document.getElementById('rebookDropinSlots');
+const rebookStartTimeInput = document.getElementById('rebookStartTime');
+const rebookEndTimeInput = document.getElementById('rebookEndTime');
+// Same 7:00 AM-9:00 PM, 30-min options as the main booking form -- a plain
+// <input type="time"> let a stray scroll/click land on something like
+// "8:08 AM" for an overnight drop-off, which is exactly the kind of bad
+// data this avoids.
+populateTimeOptions(rebookStartTimeInput);
+populateTimeOptions(rebookEndTimeInput);
 const rebookPresetTimesGroup = document.getElementById('rebookPresetTimesGroup');
 const rebookPresetTimes = document.getElementById('rebookPresetTimes');
+const rebookExtraDates = document.getElementById('rebookExtraDates');
+const addRebookDateBtn = document.getElementById('addRebookDateBtn');
+
+function collectRebookExtraDates() {
+  return [...rebookExtraDates.querySelectorAll('input[type="date"]')]
+    .map((el) => el.value)
+    .filter(Boolean);
+}
+
+addRebookDateBtn.addEventListener('click', () => {
+  const row = document.createElement('div');
+  row.className = 'dropin-extra-date-row';
+  const input = document.createElement('input');
+  input.type = 'date';
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'btn btn-outline';
+  removeBtn.textContent = 'Remove';
+  removeBtn.addEventListener('click', () => row.remove());
+  row.appendChild(input);
+  row.appendChild(removeBtn);
+  rebookExtraDates.appendChild(row);
+});
 
 // Holds the signed-in client's portal data (profile, sections, bookings).
 // Declared here (rather than down by the rest of the portal-rendering code)
@@ -1269,12 +1358,25 @@ function updateRebookFieldVisibility() {
   } else {
     selectedRebookSlots.clear();
     rebookDropinSlots.innerHTML = '';
+    rebookExtraDates.innerHTML = '';
   }
   renderRebookPresetTimes();
 }
 rebookServiceType.addEventListener('change', updateRebookFieldVisibility);
 rebookStartDateInput.addEventListener('change', () => {
+  // End date can't be before the (possibly new) start date -- also nudges
+  // native date pickers to open showing the start date's month.
+  rebookEndDateInput.min = rebookStartDateInput.value || '';
+  if (rebookEndDateInput.value && rebookStartDateInput.value && rebookEndDateInput.value < rebookStartDateInput.value) {
+    rebookEndDateInput.value = '';
+  }
   if (rebookServiceType.value === 'Drop-In Visit') renderRebookTimeSlots();
+});
+rebookEndDateInput.addEventListener('change', () => {
+  if (rebookStartDateInput.value && rebookEndDateInput.value && rebookEndDateInput.value < rebookStartDateInput.value) {
+    alert('End date cannot be before the start date.');
+    rebookEndDateInput.value = '';
+  }
 });
 updateRebookFieldVisibility();
 
@@ -1292,26 +1394,43 @@ rebookForm.addEventListener('submit', async (e) => {
   }
   const data = new FormData(rebookForm);
   const body = Object.fromEntries(data.entries());
+  let extraRebookDates = [];
   if (body.serviceType === 'Drop-In Visit') {
     if (selectedRebookSlots.size === 0) {
       showRebookStatus('Please choose at least one available time.', 'error');
       return;
     }
     body.startTime = [...selectedRebookSlots].sort().join(',');
+    extraRebookDates = collectRebookExtraDates();
   }
+  // A multi-date drop-in request becomes one rebook per date, all with the
+  // same requested times -- there's no single-booking concept of a
+  // non-contiguous set of dates.
+  const requestDates = extraRebookDates.length ? [body.startDate, ...extraRebookDates] : [body.startDate];
+
   showRebookStatus('Sending your request...', '');
   try {
-    const res = await fetch(`${BOOKING_API}/api/client-portal/${currentPortalData.clientId}/rebook`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const result = await res.json();
-    if (!res.ok) {
-      showRebookStatus(result.error || 'Something went wrong — please try again.', 'error');
+    const results = [];
+    for (const requestDate of requestDates) {
+      const res = await fetch(`${BOOKING_API}/api/client-portal/${currentPortalData.clientId}/rebook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...body, startDate: requestDate }),
+      });
+      const result = await res.json();
+      results.push({ date: requestDate, ok: res.ok, error: result.error });
+    }
+    const failed = results.filter((r) => !r.ok);
+    if (failed.length === results.length) {
+      showRebookStatus(failed[0].error || 'Something went wrong — please try again.', 'error');
       return;
     }
-    showRebookStatus("Request sent! We'll confirm it shortly.", 'success');
+    showRebookStatus(
+      failed.length
+        ? `Request sent for ${results.length - failed.length} of ${results.length} date(s). Couldn't book: ${failed.map((f) => `${formatDate(f.date)} (${f.error})`).join('; ')}`
+        : "Request sent! We'll confirm it shortly.",
+      failed.length ? 'error' : 'success'
+    );
     rebookForm.reset();
     updateRebookFieldVisibility();
     // Refresh the My Bookings tab so the new request shows up immediately.
