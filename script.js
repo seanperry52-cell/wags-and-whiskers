@@ -1180,10 +1180,49 @@ const rebookServiceType = document.getElementById('rebookServiceType');
 const rebookStatus = document.getElementById('rebookStatus');
 const rebookStartDateInput = document.getElementById('rebookStartDate');
 const rebookDropinSlots = document.getElementById('rebookDropinSlots');
+const rebookPresetTimesGroup = document.getElementById('rebookPresetTimesGroup');
+const rebookPresetTimes = document.getElementById('rebookPresetTimes');
+
+// Holds the signed-in client's portal data (profile, sections, bookings).
+// Declared here (rather than down by the rest of the portal-rendering code)
+// because updateRebookFieldVisibility() below runs once unconditionally at
+// load time, before sign-in -- a `let` declared later would still be in
+// its temporal dead zone at that point and throw.
+let currentPortalData = null;
 
 // Same idea as the main booking form's slot picker (selectedSlots above) --
 // a drop-in visit can cover more than one check-in on the same day.
 let selectedRebookSlots = new Set();
+
+// Some clients (set by Misti via the admin client directory's "Drop-In
+// Presets" tab) have a handful of usual drop-in times -- show those as
+// one-tap quick-select buttons above the full slot grid so picking them
+// doesn't mean hunting through 7am-9pm every time. Purely a convenience
+// shortcut into the same selectedRebookSlots set the real grid uses.
+function renderRebookPresetTimes() {
+  const presetTimes = String(currentPortalData?.sections?.['Drop-In Presets']?.times || '')
+    .split(',').map((t) => t.trim()).filter(Boolean);
+  if (rebookServiceType.value !== 'Drop-In Visit' || !presetTimes.length) {
+    rebookPresetTimesGroup.hidden = true;
+    rebookPresetTimes.innerHTML = '';
+    return;
+  }
+  rebookPresetTimesGroup.hidden = false;
+  rebookPresetTimes.innerHTML = '';
+  presetTimes.forEach((time) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `slot-btn ${selectedRebookSlots.has(time) ? 'slot-selected' : 'slot-available'}`;
+    btn.textContent = formatTime(time);
+    btn.addEventListener('click', () => {
+      if (selectedRebookSlots.has(time)) selectedRebookSlots.delete(time);
+      else selectedRebookSlots.add(time);
+      renderRebookPresetTimes();
+      renderRebookTimeSlots();
+    });
+    rebookPresetTimes.appendChild(btn);
+  });
+}
 
 async function renderRebookTimeSlots() {
   const date = rebookStartDateInput.value;
@@ -1231,6 +1270,7 @@ function updateRebookFieldVisibility() {
     selectedRebookSlots.clear();
     rebookDropinSlots.innerHTML = '';
   }
+  renderRebookPresetTimes();
 }
 rebookServiceType.addEventListener('change', updateRebookFieldVisibility);
 rebookStartDateInput.addEventListener('change', () => {
@@ -1314,8 +1354,6 @@ function formatClientSince(unixSeconds) {
   const dateLabel = since.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   return `Client since ${dateLabel} — that's ${parts.join(', ')}! 🐾`;
 }
-
-let currentPortalData = null;
 
 const PROFILE_FIELDS = [
   ['ownerName', 'Name', 'text'],
@@ -1572,6 +1610,8 @@ function renderPortalOverview(data) {
   updateWelcomeAvatar();
   renderOverviewBody();
   renderRebookPetOptions();
+  selectedRebookSlots.clear();
+  renderRebookPresetTimes();
 }
 
 // Best-effort split of a free-text pet_info string into individual pet
