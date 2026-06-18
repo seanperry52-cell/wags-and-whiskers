@@ -180,11 +180,9 @@ const endTimeGroup = document.getElementById('endTimeGroup');
 const endTimeInput = document.getElementById('endTime');
 const dropinSlotsGroup = document.getElementById('dropinSlotsGroup');
 const dropinSlots = document.getElementById('dropinSlots');
-const dropinExtraDatesGroup = document.getElementById('dropinExtraDatesGroup');
-const dropinExtraDates = document.getElementById('dropinExtraDates');
-const addDropinDateBtn = document.getElementById('addDropinDateBtn');
 const endDateInput = document.getElementById('endDate');
 const endDateGroup = document.getElementById('endDateGroup');
+const endDateLabel = document.getElementById('endDateLabel');
 const scheduleFields = document.getElementById('scheduleFields');
 const ongoingScheduleNote = document.getElementById('ongoingScheduleNote');
 const clientTypeRadios = document.querySelectorAll('input[name="clientType"]');
@@ -246,31 +244,17 @@ function collectAdditionalPets() {
   });
 }
 
-// A drop-in visit can be requested for several (not necessarily
-// contiguous) dates at once, e.g. Mon/Wed/Fri with the same times each
-// day -- each "+ Add Another Date" row is its own plain date input;
-// there's no separate Set to keep in sync, just read the DOM at submit time.
-function collectDropinExtraDates() {
-  return [...dropinExtraDates.querySelectorAll('input[type="date"]')]
-    .map((el) => el.value)
-    .filter(Boolean);
+// Enumerates every date from start to end (inclusive), both "YYYY-MM-DD" strings.
+function dateRangeArray(startStr, endStr) {
+  const dates = [];
+  const cur = new Date(`${startStr}T00:00:00`);
+  const end = new Date(`${endStr}T00:00:00`);
+  while (cur <= end) {
+    dates.push(ymd(cur.getFullYear(), cur.getMonth(), cur.getDate()));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
 }
-
-function addDropinDateRow() {
-  const row = document.createElement('div');
-  row.className = 'dropin-extra-date-row';
-  const input = document.createElement('input');
-  input.type = 'date';
-  const removeBtn = document.createElement('button');
-  removeBtn.type = 'button';
-  removeBtn.className = 'btn btn-outline';
-  removeBtn.textContent = 'Remove';
-  removeBtn.addEventListener('click', () => row.remove());
-  row.appendChild(input);
-  row.appendChild(removeBtn);
-  dropinExtraDates.appendChild(row);
-}
-addDropinDateBtn.addEventListener('click', addDropinDateRow);
 
 // Drop-off / pick-up time pickers offer the same 7:00 AM – 9:00 PM,
 // 30-minute slot options as the drop-in time picker.
@@ -342,14 +326,14 @@ function updateTimeFields() {
   const isOvernight = serviceType === 'Overnight Stay';
   const isDayCare = serviceType === 'Day Care';
 
+  endDateLabel.textContent = isDropIn ? 'End Date (optional — same times every day)' : 'End Date';
+
   if (isOvernight || isDayCare) {
     startTimeGroup.hidden = false;
     startTimeLabel.textContent = 'Drop-off Time';
     endTimeGroup.hidden = false;
     dropinSlotsGroup.hidden = true;
     dropinSlots.innerHTML = '';
-    dropinExtraDatesGroup.hidden = true;
-    dropinExtraDates.innerHTML = '';
   } else if (isDropIn) {
     startTimeGroup.hidden = true;
     endTimeGroup.hidden = true;
@@ -357,7 +341,6 @@ function updateTimeFields() {
     dropinSlotsGroup.hidden = false;
     selectedSlots.clear();
     renderTimeSlots();
-    dropinExtraDatesGroup.hidden = false;
   } else {
     startTimeGroup.hidden = false;
     startTimeLabel.textContent = 'Preferred Time';
@@ -365,8 +348,6 @@ function updateTimeFields() {
     endTimeInput.value = '';
     dropinSlotsGroup.hidden = true;
     dropinSlots.innerHTML = '';
-    dropinExtraDatesGroup.hidden = true;
-    dropinExtraDates.innerHTML = '';
   }
 }
 
@@ -995,7 +976,7 @@ bookingForm.addEventListener('submit', async (e) => {
     if (/_\d+$/.test(key)) delete d[key];
   }
 
-  let extraDropinDates = [];
+  let requestDates = [d.startDate];
   if (ongoing) {
     d.endDate = '';
     d.startTime = '';
@@ -1005,14 +986,15 @@ bookingForm.addEventListener('submit', async (e) => {
       return;
     }
     d.startTime = [...selectedSlots].sort().join(',');
-    extraDropinDates = collectDropinExtraDates();
+    // A drop-in's End Date means "request these same times every day in
+    // this range," not a single multi-night stay -- each day becomes its
+    // own independent booking/approval, so the per-booking endDate itself
+    // is cleared below.
+    if (d.endDate && d.endDate !== d.startDate) {
+      requestDates = dateRangeArray(d.startDate, d.endDate);
+    }
+    d.endDate = '';
   }
-
-  // A multi-date drop-in request (the primary date plus any "Other Dates")
-  // becomes one booking per date, all with the same requested times --
-  // there's no single-booking concept of a non-contiguous set of dates,
-  // so each date is its own independent request/approval.
-  const requestDates = extraDropinDates.length ? [d.startDate, ...extraDropinDates] : [d.startDate];
   const dateResults = [];
 
   // Reserve the request(s) with the booking system first — for overnight/day
@@ -1248,29 +1230,6 @@ populateTimeOptions(rebookStartTimeInput);
 populateTimeOptions(rebookEndTimeInput);
 const rebookPresetTimesGroup = document.getElementById('rebookPresetTimesGroup');
 const rebookPresetTimes = document.getElementById('rebookPresetTimes');
-const rebookExtraDates = document.getElementById('rebookExtraDates');
-const addRebookDateBtn = document.getElementById('addRebookDateBtn');
-
-function collectRebookExtraDates() {
-  return [...rebookExtraDates.querySelectorAll('input[type="date"]')]
-    .map((el) => el.value)
-    .filter(Boolean);
-}
-
-addRebookDateBtn.addEventListener('click', () => {
-  const row = document.createElement('div');
-  row.className = 'dropin-extra-date-row';
-  const input = document.createElement('input');
-  input.type = 'date';
-  const removeBtn = document.createElement('button');
-  removeBtn.type = 'button';
-  removeBtn.className = 'btn btn-outline';
-  removeBtn.textContent = 'Remove';
-  removeBtn.addEventListener('click', () => row.remove());
-  row.appendChild(input);
-  row.appendChild(removeBtn);
-  rebookExtraDates.appendChild(row);
-});
 
 // Holds the signed-in client's portal data (profile, sections, bookings).
 // Declared here (rather than down by the rest of the portal-rendering code)
@@ -1358,7 +1317,6 @@ function updateRebookFieldVisibility() {
   } else {
     selectedRebookSlots.clear();
     rebookDropinSlots.innerHTML = '';
-    rebookExtraDates.innerHTML = '';
   }
   renderRebookPresetTimes();
 }
@@ -1394,19 +1352,20 @@ rebookForm.addEventListener('submit', async (e) => {
   }
   const data = new FormData(rebookForm);
   const body = Object.fromEntries(data.entries());
-  let extraRebookDates = [];
+  let requestDates = [body.startDate];
   if (body.serviceType === 'Drop-In Visit') {
     if (selectedRebookSlots.size === 0) {
       showRebookStatus('Please choose at least one available time.', 'error');
       return;
     }
     body.startTime = [...selectedRebookSlots].sort().join(',');
-    extraRebookDates = collectRebookExtraDates();
+    // A drop-in's End Date means "request these same times every day in
+    // this range" -- each day becomes its own independent rebook request.
+    if (body.endDate && body.endDate !== body.startDate) {
+      requestDates = dateRangeArray(body.startDate, body.endDate);
+    }
+    body.endDate = '';
   }
-  // A multi-date drop-in request becomes one rebook per date, all with the
-  // same requested times -- there's no single-booking concept of a
-  // non-contiguous set of dates.
-  const requestDates = extraRebookDates.length ? [body.startDate, ...extraRebookDates] : [body.startDate];
 
   showRebookStatus('Sending your request...', '');
   try {

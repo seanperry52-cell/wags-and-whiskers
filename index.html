@@ -66,8 +66,8 @@
               <label for="rebookStartDate">Start Date</label>
               <input type="date" id="rebookStartDate" name="startDate" required />
             </div>
-            <div class="form-group" data-rebook-for="Overnight Stay,Day Care" hidden>
-              <label for="rebookEndDate">End Date</label>
+            <div class="form-group" data-rebook-for="Overnight Stay,Day Care,Drop-In Visit" hidden>
+              <label for="rebookEndDate">End Date <span class="field-hint">(optional &mdash; for multiple days)</span></label>
               <input type="date" id="rebookEndDate" name="endDate" />
             </div>
           </div>
@@ -88,11 +88,6 @@
           <div class="form-group full" id="rebookDropinSlotsGroup" data-rebook-for="Drop-In Visit" hidden>
             <label>Available Times <span class="field-hint">(select one or more)</span></label>
             <div id="rebookDropinSlots" class="dropin-slots"></div>
-          </div>
-          <div class="form-group full" id="rebookExtraDatesGroup" data-rebook-for="Drop-In Visit" hidden>
-            <label>Other Dates for This Request <span class="field-hint">(optional &mdash; same times each day)</span></label>
-            <div id="rebookExtraDates"></div>
-            <button type="button" id="addRebookDateBtn" class="btn btn-outline">+ Add Another Date</button>
           </div>
           <div class="form-group full">
             <label for="rebookNotes">Anything we should know for this visit?</label>
@@ -494,7 +489,7 @@
                   <input type="date" id="startDate" name="startDate" required />
                 </div>
                 <div class="form-group" id="endDateGroup">
-                  <label for="endDate">End Date</label>
+                  <label for="endDate" id="endDateLabel">End Date</label>
                   <input type="date" id="endDate" name="endDate" />
                 </div>
               </div>
@@ -511,14 +506,8 @@
               </div>
 
               <div class="form-group full" id="dropinSlotsGroup" hidden>
-                <label>Available Times <span class="field-hint">(select one or more)</span></label>
+                <label>Available Times <span class="field-hint">(select one or more &mdash; applied to every day if you set an end date above)</span></label>
                 <div id="dropinSlots" class="dropin-slots"></div>
-              </div>
-
-              <div class="form-group full" id="dropinExtraDatesGroup" hidden>
-                <label>Other Dates for This Request <span class="field-hint">(optional &mdash; same times each day)</span></label>
-                <div id="dropinExtraDates"></div>
-                <button type="button" id="addDropinDateBtn" class="btn btn-outline">+ Add Another Date</button>
               </div>
             </div>
           </div>
