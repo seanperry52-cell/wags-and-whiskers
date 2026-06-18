@@ -76,19 +76,18 @@ function ymd(year, month, day) {
 const calMonth = new Date();
 calMonth.setDate(1);
 
-// Tracks which day the client has actually picked on the calendar, so it
-// can be highlighted and so re-renders (e.g. switching service type) don't
-// lose the selection.
+// Tracks which day(s) the client has actually picked, so the calendar can
+// highlight the whole chosen range (start..end) and re-renders (e.g.
+// switching service type) don't lose the selection.
 let selectedCalendarDate = null;
+let selectedCalendarEndDate = null;
 
 // Clicking an available day sets the real startDate field and re-runs its
 // change handler, which is what actually loads/refreshes the drop-in time
 // slots below -- the calendar is the picker, not a separate read-only view.
 function selectCalendarDate(dateStr) {
-  selectedCalendarDate = dateStr;
   startDateInput.value = dateStr;
   startDateInput.dispatchEvent(new Event('change'));
-  renderCalendar();
   document.getElementById('scheduleFields').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -139,7 +138,16 @@ async function renderCalendar() {
     const unavailableForService = blockedSet.has(dateStr) || (bookedSet.has(dateStr) && !isDropIn);
     if (unavailableForService) cell.classList.add('cal-unavailable');
     else cell.classList.add('cal-available');
-    if (dateStr === selectedCalendarDate) cell.classList.add('cal-selected');
+    // Highlight the whole chosen range so an overnight/day-care client can
+    // see at a glance whether every night in between is actually open --
+    // an unavailable day keeps its red/strikethrough styling instead of
+    // being painted over, so it still stands out within the range.
+    const inSelectedRange = !unavailableForService && selectedCalendarDate && (
+      selectedCalendarEndDate
+        ? dateStr >= selectedCalendarDate && dateStr <= selectedCalendarEndDate
+        : dateStr === selectedCalendarDate
+    );
+    if (inSelectedRange) cell.classList.add('cal-selected');
     cell.textContent = day;
     if (!unavailableForService) {
       cell.addEventListener('click', () => selectCalendarDate(dateStr));
@@ -357,10 +365,31 @@ serviceTypeSelect.addEventListener('change', () => {
 });
 startDateInput.addEventListener('change', () => {
   startTimeInput.value = '';
+  selectedCalendarDate = startDateInput.value || null;
+  // End date can't be before the (possibly new) start date -- this also
+  // nudges native date pickers to open showing the same month as the
+  // start date instead of whatever month they last happened to be on.
+  endDateInput.min = startDateInput.value || '';
+  if (endDateInput.value && startDateInput.value && endDateInput.value < startDateInput.value) {
+    endDateInput.value = '';
+    selectedCalendarEndDate = null;
+  }
+  renderCalendar();
   if (DROP_IN_SERVICES.has(serviceTypeSelect.value)) {
     selectedSlots.clear();
     renderTimeSlots();
   }
+});
+endDateInput.addEventListener('change', () => {
+  if (startDateInput.value && endDateInput.value && endDateInput.value < startDateInput.value) {
+    alert('End date cannot be before the start date.');
+    endDateInput.value = '';
+    selectedCalendarEndDate = null;
+    renderCalendar();
+    return;
+  }
+  selectedCalendarEndDate = endDateInput.value || null;
+  renderCalendar();
 });
 clientTypeRadios.forEach(r => r.addEventListener('change', updateBookingTypeFields));
 updateTimeFields();
@@ -1560,7 +1589,13 @@ function splitPetNames(petInfo) {
   if (str.includes(';')) {
     return str.split(';').map((s) => s.split(',')[0].trim()).filter(Boolean);
   }
-  return [str.split(',')[0].trim()].filter(Boolean);
+  // No parens/semicolons -- the first comma-segment is the name field, but
+  // it may itself join multiple pets with "and"/"&" (e.g. "Leo and Lainey,
+  // dogs" or "Sadie & Ellie, Pug & Puggle, ..."), which is common enough in
+  // freeform-entered records that it is worth splitting on.
+  const nameField = str.split(',')[0].trim();
+  const names = nameField.split(/s+(?:and|&)s+/i).map((n) => n.trim()).filter(Boolean);
+  return names.length ? names : [str].filter(Boolean);
 }
 
 function renderRebookPetOptions() {
