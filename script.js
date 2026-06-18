@@ -480,7 +480,6 @@ const MAX_SERVICE_MILES = 10;
 const ADDITIONAL_DOG_ADDON = {
   'Overnight Stay': 30,
   'Day Care': 25,
-  'Drop-In Visit': 8,
 };
 
 // Pet Profile "Age" is free text (e.g. "8 weeks", "5 months", "2", "3 years") —
@@ -755,8 +754,11 @@ function buildContractHtml(d) {
     const totalVisits = visitCount * daySpan;
     const extended = totalVisits >= 14;
     const rates = extended ? DROP_IN_EXTENDED_RATES : DROP_IN_RATES;
-    rate = (isFar ? rates.far : rates.near) + (isPuppy ? PUPPY_ADDON : 0) + additionalDogAddon;
-    unit = `per visit (30 min, ${isFar ? '5+' : 'under 5'} mi from Misti's home${extended ? ', extended rate (14+ visits in this request)' : ''}${isPuppy ? ' + puppy add-on' : ''})${additionalDogNote}`;
+    // Flat per-visit rate -- covers the whole household at that visit,
+    // regardless of how many pets are there (per-dog addons only apply
+    // to Overnight/Day Care, where each pet occupies its own space).
+    rate = (isFar ? rates.far : rates.near) + (isPuppy ? PUPPY_ADDON : 0);
+    unit = `per visit (30 min, ${isFar ? '5+' : 'under 5'} mi from Misti's home${extended ? ', extended rate (14+ visits in this request)' : ''}${isPuppy ? ' + puppy add-on' : ''})`;
     dailyTotal = daySpan > 1 ? `$${(rate * visitCount).toFixed(2)}` : '';
     visitTotal = `$${(rate * totalVisits).toFixed(2)}`;
   }
