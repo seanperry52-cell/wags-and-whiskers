@@ -19,6 +19,7 @@ revealEls.forEach(el => revealObserver.observe(el));
 // button) can land on a tall .reveal section before the IntersectionObserver
 // fires, leaving it stuck at opacity:0. Reveal the target immediately instead.
 function revealTarget(hash) {
+  if (!hash || hash === '#') return;
   const target = document.querySelector(hash);
   if (!target) return;
   target.querySelectorAll('.reveal').forEach(el => {
@@ -1089,6 +1090,21 @@ function showBookingStatus(message, type) {
 bookingForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   bookingStatus.hidden = true;
+
+  // A required field can sit on a tab that isn't currently active (and is
+  // therefore `inert`/unfocusable) -- e.g. a second pet added via the +Add
+  // Another Pet shortcut only has its Name/Age filled in until the rest of
+  // that pet's fields are filled in on the Pet Profile tab. The browser's
+  // native validation can't focus an inert field, so the submit just does
+  // nothing with no visible error. Switch to that field's tab first so the
+  // native "please fill out this field" bubble can actually appear.
+  if (!bookingForm.checkValidity()) {
+    const firstInvalid = bookingForm.querySelector(':invalid');
+    const tabContent = firstInvalid?.closest('[data-booking-tab-content]');
+    if (tabContent) showBookingTab(tabContent.dataset.bookingTabContent);
+    firstInvalid?.reportValidity();
+    return;
+  }
 
   if (addressOutOfRange) {
     showBookingStatus(`Sorry, your address is outside our ${MAX_SERVICE_MILES}-mile service area. Please contact us directly to discuss options.`, 'error');
