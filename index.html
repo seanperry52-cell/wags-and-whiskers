@@ -469,18 +469,19 @@
         </div>
 
         <div class="booking-tab-content" data-booking-tab-content="schedule" inert>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="schedulePetName">Pet's Name</label>
-            <input type="text" id="schedulePetName" placeholder="e.g. Leo" />
-          </div>
-          <div class="form-group">
-            <label for="schedulePetAge">Pet's Age</label>
-            <input type="text" id="schedulePetAge" placeholder="e.g. 3 years, 8 months" />
+        <div id="schedulePetRows">
+          <div class="form-row schedule-pet-row" data-pet-index="1">
+            <div class="form-group">
+              <label for="schedulePetName">Pet's Name</label>
+              <input type="text" id="schedulePetName" placeholder="e.g. Leo" />
+            </div>
+            <div class="form-group">
+              <label for="schedulePetAge">Pet's Age</label>
+              <input type="text" id="schedulePetAge" placeholder="e.g. 3 years, 8 months" />
+            </div>
           </div>
         </div>
         <button type="button" id="addPetBtnSchedule" class="btn btn-outline pet-profile-add-btn">+ Add Another Pet</button>
-        <span id="addPetScheduleNote" class="field-hint" hidden>Added — fill in the new pet's details on the Pet Profile tab.</span>
 
         <div class="form-group full booking-service-type">
           <label for="serviceType">Service Type</label>

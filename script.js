@@ -196,9 +196,22 @@ const PET_PROFILE_FIELDS = [
 const petProfilesContainer = document.getElementById('petProfiles');
 const addPetBtn = document.getElementById('addPetBtn');
 const addPetBtnSchedule = document.getElementById('addPetBtnSchedule');
-const addPetScheduleNote = document.getElementById('addPetScheduleNote');
+const schedulePetRows = document.getElementById('schedulePetRows');
 let petProfileCount = 1;
 
+// Removes both halves of an added pet (the Pet Profile tab block and its
+// mirrored Name/Age row on the Date & Service tab) and refreshes the price
+// estimate, since it depends on how many pets are currently on the form.
+function removePet(index) {
+  petProfilesContainer.querySelector(`[data-pet-index="${index}"]`)?.remove();
+  schedulePetRows.querySelector(`[data-pet-index="${index}"]`)?.remove();
+  updatePriceEstimate();
+}
+
+// Adds a new pet: a full field block on the Pet Profile tab, plus a
+// lightweight Name/Age row right under the first pet on the Date & Service
+// tab (mirrored into the Pet Profile block the same way the first pet's
+// schedule-tab fields mirror into #petName/#petAge).
 function addPetProfileBlock() {
   petProfileCount++;
   const index = petProfileCount;
@@ -225,17 +238,43 @@ function addPetProfileBlock() {
   removeBtn.type = 'button';
   removeBtn.className = 'btn btn-outline remove-pet-btn';
   removeBtn.textContent = 'Remove This Pet';
-  removeBtn.addEventListener('click', () => block.remove());
+  removeBtn.addEventListener('click', () => removePet(index));
   block.appendChild(removeBtn);
 
   petProfilesContainer.appendChild(block);
+
+  const row = document.createElement('div');
+  row.className = 'form-row schedule-pet-row';
+  row.dataset.petIndex = index;
+  row.innerHTML = `
+    <div class="form-group">
+      <label for="schedulePetName_${index}">Pet's Name</label>
+      <input type="text" id="schedulePetName_${index}" placeholder="e.g. Leo" />
+    </div>
+    <div class="form-group">
+      <label for="schedulePetAge_${index}">Pet's Age</label>
+      <input type="text" id="schedulePetAge_${index}" placeholder="e.g. 3 years, 8 months" />
+    </div>`;
+  const rowRemoveBtn = document.createElement('button');
+  rowRemoveBtn.type = 'button';
+  rowRemoveBtn.className = 'btn btn-outline remove-pet-btn';
+  rowRemoveBtn.textContent = 'Remove This Pet';
+  rowRemoveBtn.addEventListener('click', () => removePet(index));
+  row.appendChild(rowRemoveBtn);
+  schedulePetRows.appendChild(row);
+
+  const nameInput = row.querySelector(`#schedulePetName_${index}`);
+  const ageInput = row.querySelector(`#schedulePetAge_${index}`);
+  const realNameInput = block.querySelector(`#petName_${index}`);
+  const realAgeInput = block.querySelector(`#petAge_${index}`);
+  nameInput.addEventListener('input', () => { realNameInput.value = nameInput.value; });
+  ageInput.addEventListener('input', () => { realAgeInput.value = ageInput.value; });
+
+  updatePriceEstimate();
 }
 
 addPetBtn.addEventListener('click', addPetProfileBlock);
-addPetBtnSchedule.addEventListener('click', () => {
-  addPetProfileBlock();
-  addPetScheduleNote.hidden = false;
-});
+addPetBtnSchedule.addEventListener('click', addPetProfileBlock);
 
 // Gathers the additional pet profiles (index 2+) as an array of field
 // objects, for inclusion in the booking payload alongside the primary
@@ -587,10 +626,10 @@ const priceEstimateEl = document.getElementById('priceEstimate');
 
 // Lightweight live price preview shown right under the pet name/age fields
 // on the Date & Service tab, as soon as there's enough info to compute one --
-// mirrors buildContractHtml's pricing rules but only needs what's already
-// been entered on this tab. The full, authoritative price (including
-// additional-pet surcharges from the Pet Profile tab) is still computed at
-// contract-build time -- this is just an early estimate for one pet.
+// mirrors buildContractHtml's pricing rules, including the additional-dog
+// addon once a second (or third, etc.) pet has been added via the +Add
+// Another Pet button here. The full, authoritative price is still computed
+// at contract-build time once every Pet Profile field is filled in.
 function updatePriceEstimate() {
   const serviceType = serviceTypeSelect.value;
   const startDate = startDateInput.value;
@@ -601,15 +640,20 @@ function updatePriceEstimate() {
   const endDate = endDateInput.value;
   const isPuppy = isPuppyAge(schedulePetAgeInput.value);
   const nights = nightsBetween(startDate, endDate);
+  const additionalDogCount = petProfilesContainer.children.length - 1;
+  const additionalDogAddon = (ADDITIONAL_DOG_ADDON[serviceType] ?? 0) * additionalDogCount;
+  const additionalDogNote = additionalDogAddon
+    ? ` (incl. $${(ADDITIONAL_DOG_ADDON[serviceType] ?? 0).toFixed(2)} x ${additionalDogCount} additional dog${additionalDogCount > 1 ? 's' : ''})`
+    : '';
   let text = '';
 
   if (serviceType === 'Overnight Stay') {
-    const rate = nights >= 10 ? 40 : (isPuppy ? OVERNIGHT_PUPPY_RATE : RATE_INFO['Overnight Stay'].rate);
-    text = `Estimated total: $${rate}/night × ${nights} night${nights === 1 ? '' : 's'} = $${(rate * nights).toFixed(2)}`;
+    const rate = (nights >= 10 ? 40 : (isPuppy ? OVERNIGHT_PUPPY_RATE : RATE_INFO['Overnight Stay'].rate)) + additionalDogAddon;
+    text = `Estimated total: $${rate}/night × ${nights} night${nights === 1 ? '' : 's'} = $${(rate * nights).toFixed(2)}${additionalDogNote}`;
   } else if (serviceType === 'Day Care') {
-    const rate = isPuppy ? 45 : RATE_INFO['Day Care'].rate;
+    const rate = (isPuppy ? 45 : RATE_INFO['Day Care'].rate) + additionalDogAddon;
     const days = (endDate && endDate !== startDate) ? nights + 1 : 1;
-    text = `Estimated total: $${rate}/day × ${days} day${days === 1 ? '' : 's'} = $${(rate * days).toFixed(2)}`;
+    text = `Estimated total: $${rate}/day × ${days} day${days === 1 ? '' : 's'} = $${(rate * days).toFixed(2)}${additionalDogNote}`;
   } else if (serviceType === 'Drop-In Visit') {
     if (!distanceMilesInput.value) {
       priceEstimateEl.hidden = true;
