@@ -457,6 +457,8 @@ endDateInput.addEventListener('change', () => {
   updatePriceEstimate();
 });
 clientTypeRadios.forEach(r => r.addEventListener('change', updateBookingTypeFields));
+startTimeInput.addEventListener('change', updatePriceEstimate);
+endTimeInput.addEventListener('change', updatePriceEstimate);
 updateTimeFields();
 updateBookingTypeFields();
 
@@ -649,7 +651,11 @@ function updatePriceEstimate() {
 
   if (serviceType === 'Overnight Stay') {
     const rate = (nights >= 10 ? 40 : (isPuppy ? OVERNIGHT_PUPPY_RATE : RATE_INFO['Overnight Stay'].rate)) + additionalDogAddon;
-    text = `Estimated total: $${rate}/night × ${nights} night${nights === 1 ? '' : 's'} = $${(rate * nights).toFixed(2)}${additionalDogNote}`;
+    const over24Fee = overnightExtraHours(
+      { startDate, endDate, startTime: startTimeInput.value, endTime: endTimeInput.value }, nights
+    ) > 0 ? OVERNIGHT_OVER_24H_FEE : 0;
+    const over24Note = over24Fee ? ` (incl. $${over24Fee.toFixed(2)} over-24-hour fee)` : '';
+    text = `Estimated total: $${rate}/night × ${nights} night${nights === 1 ? '' : 's'} = $${(rate * nights + over24Fee).toFixed(2)}${additionalDogNote}${over24Note}`;
   } else if (serviceType === 'Day Care') {
     const rate = (isPuppy ? 45 : RATE_INFO['Day Care'].rate) + additionalDogAddon;
     const days = (endDate && endDate !== startDate) ? nights + 1 : 1;
