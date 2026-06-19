@@ -1529,16 +1529,30 @@ function updateRebookFieldVisibility() {
 }
 rebookServiceType.addEventListener('change', updateRebookFieldVisibility);
 rebookStartDateInput.addEventListener('change', () => {
+  if (!isPlausibleDateValue(rebookStartDateInput.value)) return;
   // End date can't be before the (possibly new) start date -- also nudges
   // native date pickers to open showing the start date's month.
   rebookEndDateInput.min = rebookStartDateInput.value || '';
-  if (rebookEndDateInput.value && rebookStartDateInput.value && rebookEndDateInput.value < rebookStartDateInput.value) {
+  if (rebookEndDateInput.value && rebookEndDateInput.value < rebookStartDateInput.value) {
     rebookEndDateInput.value = '';
   }
   if (rebookServiceType.value === 'Drop-In Visit') renderRebookTimeSlots();
 });
+// A native <input type="date">'s `change` event can fire mid-typing once a
+// segment looks "complete" -- e.g. typing just the first digit of a year
+// briefly forms a zero-padded date like 0002-07-01, which is technically a
+// valid complete date and is *always* before the start date. Without this
+// guard, that fires the alert and wipes the field before the user finishes
+// typing the year they actually meant. Treat a year far from "now" as still
+// mid-edit rather than a deliberate value.
+function isPlausibleDateValue(value) {
+  if (!value) return false;
+  const year = Number(value.slice(0, 4));
+  return year >= new Date().getFullYear() - 1;
+}
 rebookEndDateInput.addEventListener('change', () => {
-  if (rebookStartDateInput.value && rebookEndDateInput.value && rebookEndDateInput.value < rebookStartDateInput.value) {
+  if (!isPlausibleDateValue(rebookEndDateInput.value)) return;
+  if (rebookStartDateInput.value && rebookEndDateInput.value < rebookStartDateInput.value) {
     alert('End date cannot be before the start date.');
     rebookEndDateInput.value = '';
   }
