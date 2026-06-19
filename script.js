@@ -82,13 +82,57 @@ calMonth.setDate(1);
 let selectedCalendarDate = null;
 let selectedCalendarEndDate = null;
 
-// Clicking an available day sets the real startDate field and re-runs its
-// change handler, which is what actually loads/refreshes the drop-in time
-// slots below -- the calendar is the picker, not a separate read-only view.
+const calendarTimePanel = document.getElementById('calendarTimePanel');
+const calendarTimePanelSummary = document.getElementById('calendarTimePanelSummary');
+
+function formatCalendarDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Reflects the current start/end selection above the time picker, and is
+// also what reveals the panel in the first place -- it stays hidden until
+// a date has actually been picked.
+function updateCalendarTimePanel() {
+  const start = startDateInput.value;
+  if (!start) {
+    calendarTimePanel.hidden = true;
+    return;
+  }
+  calendarTimePanel.hidden = false;
+  const end = endDateInput.value;
+  const prefix = isOngoingClient() ? 'Preferred first date' : 'Selected';
+  calendarTimePanelSummary.textContent = (end && end !== start)
+    ? `${prefix}: ${formatCalendarDate(start)} – ${formatCalendarDate(end)}`
+    : `${prefix}: ${formatCalendarDate(start)}`;
+}
+
+// Clicking an available day drives the real (hidden) startDate/endDate
+// fields and re-runs their change handlers, which load/refresh the drop-in
+// time slots in the panel below -- the calendar is the picker, not a
+// separate read-only view. A second click on a later date completes a
+// date range; clicking the start date again clears a previously-set end
+// date back to a single day; any other click starts a fresh selection.
 function selectCalendarDate(dateStr) {
-  startDateInput.value = dateStr;
-  startDateInput.dispatchEvent(new Event('change'));
-  document.getElementById('scheduleFields').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  const ongoing = isOngoingClient();
+  if (ongoing) {
+    startDateInput.value = dateStr;
+    startDateInput.dispatchEvent(new Event('change'));
+  } else if (dateStr === selectedCalendarDate) {
+    if (endDateInput.value) {
+      endDateInput.value = '';
+      endDateInput.dispatchEvent(new Event('change'));
+    }
+  } else if (!selectedCalendarDate || selectedCalendarEndDate || dateStr < selectedCalendarDate) {
+    startDateInput.value = dateStr;
+    endDateInput.value = '';
+    startDateInput.dispatchEvent(new Event('change'));
+  } else {
+    endDateInput.value = dateStr;
+    endDateInput.dispatchEvent(new Event('change'));
+  }
+  updateCalendarTimePanel();
+  calendarTimePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 async function renderCalendar() {
@@ -172,7 +216,6 @@ const DROP_IN_SERVICES = new Set(['Drop-In Visit']);
 
 const serviceTypeSelect = document.getElementById('serviceType');
 const startDateInput = document.getElementById('startDate');
-const startDateLabel = document.getElementById('startDateLabel');
 const startTimeGroup = document.getElementById('startTimeGroup');
 const startTimeLabel = document.getElementById('startTimeLabel');
 const startTimeInput = document.getElementById('startTime');
@@ -181,8 +224,6 @@ const endTimeInput = document.getElementById('endTime');
 const dropinSlotsGroup = document.getElementById('dropinSlotsGroup');
 const dropinSlots = document.getElementById('dropinSlots');
 const endDateInput = document.getElementById('endDate');
-const endDateGroup = document.getElementById('endDateGroup');
-const endDateLabel = document.getElementById('endDateLabel');
 const scheduleFields = document.getElementById('scheduleFields');
 const ongoingScheduleNote = document.getElementById('ongoingScheduleNote');
 const clientTypeRadios = document.querySelectorAll('input[name="clientType"]');
@@ -374,8 +415,6 @@ function updateTimeFields() {
   const isOvernight = serviceType === 'Overnight Stay';
   const isDayCare = serviceType === 'Day Care';
 
-  endDateLabel.textContent = isDropIn ? 'End Date (optional — same times every day)' : 'End Date';
-
   if (isOvernight || isDayCare) {
     startTimeGroup.hidden = false;
     startTimeLabel.textContent = 'Drop-off Time';
@@ -407,17 +446,21 @@ function updateBookingTypeFields() {
   const ongoing = isOngoingClient();
   scheduleFields.hidden = false;
   ongoingScheduleNote.hidden = !ongoing;
-  endDateGroup.hidden = ongoing;
   startDateInput.required = true;
-  startDateLabel.textContent = ongoing ? 'Preferred First Date' : 'Start Date';
   if (ongoing) {
     startTimeGroup.hidden = true;
     endTimeGroup.hidden = true;
     dropinSlotsGroup.hidden = true;
     selectedSlots.clear();
+    if (endDateInput.value) {
+      endDateInput.value = '';
+      selectedCalendarEndDate = null;
+    }
   } else {
     updateTimeFields();
   }
+  renderCalendar();
+  updateCalendarTimePanel();
 }
 
 serviceTypeSelect.addEventListener('change', () => {
@@ -443,6 +486,7 @@ startDateInput.addEventListener('change', () => {
     renderTimeSlots();
   }
   updatePriceEstimate();
+  updateCalendarTimePanel();
 });
 endDateInput.addEventListener('change', () => {
   if (startDateInput.value && endDateInput.value && endDateInput.value < startDateInput.value) {
@@ -450,11 +494,13 @@ endDateInput.addEventListener('change', () => {
     endDateInput.value = '';
     selectedCalendarEndDate = null;
     renderCalendar();
+    updateCalendarTimePanel();
     return;
   }
   selectedCalendarEndDate = endDateInput.value || null;
   renderCalendar();
   updatePriceEstimate();
+  updateCalendarTimePanel();
 });
 clientTypeRadios.forEach(r => r.addEventListener('change', updateBookingTypeFields));
 startTimeInput.addEventListener('change', updatePriceEstimate);

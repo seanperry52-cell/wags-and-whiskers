@@ -505,7 +505,31 @@
               <span><i class="dot dot-available"></i> Available</span>
               <span><i class="dot dot-unavailable"></i> Unavailable</span>
             </div>
-            <p class="calendar-note">Drop-in visits and walks don't take a full day — pick your date and service below to see open time slots.</p>
+            <p class="calendar-note">Click an available date to pick it — click a second, later date to book a range. Drop-in visits and walks don't take a full day, so you'll pick a time right here after choosing a date.</p>
+
+            <input type="hidden" id="startDate" name="startDate" required />
+            <input type="hidden" id="endDate" name="endDate" />
+
+            <div id="calendarTimePanel" class="calendar-time-panel" hidden>
+              <p id="calendarTimePanelSummary" class="calendar-time-panel__summary"></p>
+              <div id="scheduleFields">
+                <div class="form-row">
+                  <div class="form-group" id="startTimeGroup">
+                    <label for="startTime" id="startTimeLabel">Preferred Time</label>
+                    <select id="startTime" name="startTime"></select>
+                  </div>
+                  <div class="form-group" id="endTimeGroup" hidden>
+                    <label for="endTime">Pick-up Time</label>
+                    <select id="endTime" name="endTime"></select>
+                  </div>
+                </div>
+
+                <div class="form-group full" id="dropinSlotsGroup" hidden>
+                  <label>Available Times <span class="field-hint">(select one or more &mdash; applied to every day if you set an end date above)</span></label>
+                  <div id="dropinSlots" class="dropin-slots"></div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="schedule-card">
@@ -524,36 +548,7 @@
               <span class="field-hint">Let us know if you'd like to set up a regular recurring schedule — extended/recurring rates may apply (see Rates &amp; Pricing).</span>
             </div>
 
-            <p id="ongoingScheduleNote" class="field-hint" hidden>As an ongoing/recurring client, pick a preferred first date below — we'll reach out to coordinate the full recurring schedule based on availability.</p>
-
-            <div id="scheduleFields">
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="startDate" id="startDateLabel">Start Date</label>
-                  <input type="date" id="startDate" name="startDate" required />
-                </div>
-                <div class="form-group" id="endDateGroup">
-                  <label for="endDate" id="endDateLabel">End Date</label>
-                  <input type="date" id="endDate" name="endDate" />
-                </div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group" id="startTimeGroup">
-                  <label for="startTime" id="startTimeLabel">Preferred Time</label>
-                  <select id="startTime" name="startTime"></select>
-                </div>
-                <div class="form-group" id="endTimeGroup" hidden>
-                  <label for="endTime">Pick-up Time</label>
-                  <select id="endTime" name="endTime"></select>
-                </div>
-              </div>
-
-              <div class="form-group full" id="dropinSlotsGroup" hidden>
-                <label>Available Times <span class="field-hint">(select one or more &mdash; applied to every day if you set an end date above)</span></label>
-                <div id="dropinSlots" class="dropin-slots"></div>
-              </div>
-            </div>
+            <p id="ongoingScheduleNote" class="field-hint" hidden>As an ongoing/recurring client, pick a preferred first date on the calendar — we'll reach out to coordinate the full recurring schedule based on availability.</p>
           </div>
         </div>
         <p id="priceEstimate" class="field-hint price-estimate" hidden></p>
