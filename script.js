@@ -376,7 +376,7 @@ async function renderTimeSlots() {
   dropinSlots.innerHTML = '<p class="slots-loading">Loading times…</p>';
   try {
     const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${date}`);
-    if (!res.ok) throw new Error('bad response');
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
     const data = await res.json();
     dropinSlots.innerHTML = '';
     (data.slots || []).forEach(s => {
@@ -399,7 +399,8 @@ async function renderTimeSlots() {
       dropinSlots.appendChild(btn);
     });
   } catch (err) {
-    dropinSlots.innerHTML = '<p class="slots-error">Could not load times — please try again.</p>';
+    dropinSlots.innerHTML = `<p class="slots-error">Could not load times (${err.message || err}) — <button type="button" id="retryTimeSlots" class="btn btn-outline">Try again</button></p>`;
+    document.getElementById('retryTimeSlots')?.addEventListener('click', renderTimeSlots);
   }
 }
 
