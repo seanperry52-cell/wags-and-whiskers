@@ -1288,9 +1288,9 @@ function closeBookingModal() {
 }
 
 bookingModalClose.addEventListener('click', closeBookingModal);
-bookingModal.addEventListener('click', (e) => {
-  if (e.target === bookingModal) closeBookingModal();
-});
+// Deliberately no click-outside-to-close here -- this is a long multi-tab
+// form, and an accidental click on the overlay while filling it out used to
+// discard everything with no confirmation. The X button is the only way out.
 
 for (const id of ['heroBookBtn', 'navBookBtn']) {
   const el = document.getElementById(id);
