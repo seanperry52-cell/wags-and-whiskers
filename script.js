@@ -195,9 +195,11 @@ const PET_PROFILE_FIELDS = [
 
 const petProfilesContainer = document.getElementById('petProfiles');
 const addPetBtn = document.getElementById('addPetBtn');
+const addPetBtnSchedule = document.getElementById('addPetBtnSchedule');
+const addPetScheduleNote = document.getElementById('addPetScheduleNote');
 let petProfileCount = 1;
 
-addPetBtn.addEventListener('click', () => {
+function addPetProfileBlock() {
   petProfileCount++;
   const index = petProfileCount;
   const template = petProfilesContainer.children[0];
@@ -227,6 +229,12 @@ addPetBtn.addEventListener('click', () => {
   block.appendChild(removeBtn);
 
   petProfilesContainer.appendChild(block);
+}
+
+addPetBtn.addEventListener('click', addPetProfileBlock);
+addPetBtnSchedule.addEventListener('click', () => {
+  addPetProfileBlock();
+  addPetScheduleNote.hidden = false;
 });
 
 // Gathers the additional pet profiles (index 2+) as an array of field
