@@ -101,10 +101,9 @@ function updateCalendarTimePanel() {
   }
   calendarTimePanel.hidden = false;
   const end = endDateInput.value;
-  const prefix = isOngoingClient() ? 'Preferred first date' : 'Selected';
   calendarTimePanelSummary.textContent = (end && end !== start)
-    ? `${prefix}: ${formatCalendarDate(start)} – ${formatCalendarDate(end)}`
-    : `${prefix}: ${formatCalendarDate(start)}`;
+    ? `Selected: ${formatCalendarDate(start)} – ${formatCalendarDate(end)}`
+    : `Selected: ${formatCalendarDate(start)}`;
 }
 
 // Clicking an available day drives the real (hidden) startDate/endDate
@@ -114,11 +113,7 @@ function updateCalendarTimePanel() {
 // date range; clicking the start date again clears a previously-set end
 // date back to a single day; any other click starts a fresh selection.
 function selectCalendarDate(dateStr) {
-  const ongoing = isOngoingClient();
-  if (ongoing) {
-    startDateInput.value = dateStr;
-    startDateInput.dispatchEvent(new Event('change'));
-  } else if (dateStr === selectedCalendarDate) {
+  if (dateStr === selectedCalendarDate) {
     if (endDateInput.value) {
       endDateInput.value = '';
       endDateInput.dispatchEvent(new Event('change'));
@@ -225,8 +220,6 @@ const dropinSlotsGroup = document.getElementById('dropinSlotsGroup');
 const dropinSlots = document.getElementById('dropinSlots');
 const endDateInput = document.getElementById('endDate');
 const scheduleFields = document.getElementById('scheduleFields');
-const ongoingScheduleNote = document.getElementById('ongoingScheduleNote');
-const clientTypeRadios = document.querySelectorAll('input[name="clientType"]');
 
 // ── Add Pet Profile (multi-pet bookings) ────────────────────────────────
 const PET_PROFILE_FIELDS = [
@@ -438,31 +431,6 @@ function updateTimeFields() {
   }
 }
 
-function isOngoingClient() {
-  return [...clientTypeRadios].find(r => r.checked)?.value === 'Ongoing';
-}
-
-function updateBookingTypeFields() {
-  const ongoing = isOngoingClient();
-  scheduleFields.hidden = false;
-  ongoingScheduleNote.hidden = !ongoing;
-  startDateInput.required = true;
-  if (ongoing) {
-    startTimeGroup.hidden = true;
-    endTimeGroup.hidden = true;
-    dropinSlotsGroup.hidden = true;
-    selectedSlots.clear();
-    if (endDateInput.value) {
-      endDateInput.value = '';
-      selectedCalendarEndDate = null;
-    }
-  } else {
-    updateTimeFields();
-  }
-  renderCalendar();
-  updateCalendarTimePanel();
-}
-
 serviceTypeSelect.addEventListener('change', () => {
   startTimeInput.value = '';
   updateTimeFields();
@@ -502,11 +470,10 @@ endDateInput.addEventListener('change', () => {
   updatePriceEstimate();
   updateCalendarTimePanel();
 });
-clientTypeRadios.forEach(r => r.addEventListener('change', updateBookingTypeFields));
 startTimeInput.addEventListener('change', updatePriceEstimate);
 endTimeInput.addEventListener('change', updatePriceEstimate);
+startDateInput.required = true;
 updateTimeFields();
-updateBookingTypeFields();
 
 // ── Booking form -> email + pre-filled printable contract ──────────────────
 const bookingForm = document.getElementById('bookingForm');
