@@ -773,6 +773,13 @@ a { color: inherit; text-decoration: none; }
   color: var(--brown-light);
 }
 
+.price-estimate {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--rust);
+  margin-top: 0.4rem;
+}
+
 .field-hint.distance-out-of-range {
   color: #b3261e;
 }

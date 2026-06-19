@@ -312,6 +312,7 @@ async function renderTimeSlots() {
           selectedSlots.add(s.time);
           btn.classList.add('slot-selected');
         }
+        updatePriceEstimate();
       });
       dropinSlots.appendChild(btn);
     });
@@ -375,7 +376,7 @@ function updateBookingTypeFields() {
 serviceTypeSelect.addEventListener('change', () => {
   startTimeInput.value = '';
   updateTimeFields();
-  updateDistancePricing();
+  updateDistancePricing().then(updatePriceEstimate);
   renderCalendar();
 });
 startDateInput.addEventListener('change', () => {
@@ -394,6 +395,7 @@ startDateInput.addEventListener('change', () => {
     selectedSlots.clear();
     renderTimeSlots();
   }
+  updatePriceEstimate();
 });
 endDateInput.addEventListener('change', () => {
   if (startDateInput.value && endDateInput.value && endDateInput.value < startDateInput.value) {
@@ -405,6 +407,7 @@ endDateInput.addEventListener('change', () => {
   }
   selectedCalendarEndDate = endDateInput.value || null;
   renderCalendar();
+  updatePriceEstimate();
 });
 clientTypeRadios.forEach(r => r.addEventListener('change', updateBookingTypeFields));
 updateTimeFields();
@@ -564,7 +567,71 @@ async function updateDistancePricing() {
   }
 }
 
-addressInput.addEventListener('blur', updateDistancePricing);
+addressInput.addEventListener('blur', async () => {
+  await updateDistancePricing();
+  updatePriceEstimate();
+});
+
+// ── Live price preview (Date & Service tab) ─────────────────────────────────
+const schedulePetNameInput = document.getElementById('schedulePetName');
+const schedulePetAgeInput = document.getElementById('schedulePetAge');
+const priceEstimateEl = document.getElementById('priceEstimate');
+
+// Lightweight live price preview shown right under the pet name/age fields
+// on the Date & Service tab, as soon as there's enough info to compute one --
+// mirrors buildContractHtml's pricing rules but only needs what's already
+// been entered on this tab. The full, authoritative price (including
+// additional-pet surcharges from the Pet Profile tab) is still computed at
+// contract-build time -- this is just an early estimate for one pet.
+function updatePriceEstimate() {
+  const serviceType = serviceTypeSelect.value;
+  const startDate = startDateInput.value;
+  if (!serviceType || !startDate || addressOutOfRange) {
+    priceEstimateEl.hidden = true;
+    return;
+  }
+  const endDate = endDateInput.value;
+  const isPuppy = isPuppyAge(schedulePetAgeInput.value);
+  const nights = nightsBetween(startDate, endDate);
+  let text = '';
+
+  if (serviceType === 'Overnight Stay') {
+    const rate = nights >= 10 ? 40 : (isPuppy ? OVERNIGHT_PUPPY_RATE : RATE_INFO['Overnight Stay'].rate);
+    text = `Estimated total: $${rate}/night × ${nights} night${nights === 1 ? '' : 's'} = $${(rate * nights).toFixed(2)}`;
+  } else if (serviceType === 'Day Care') {
+    const rate = isPuppy ? 45 : RATE_INFO['Day Care'].rate;
+    const days = (endDate && endDate !== startDate) ? nights + 1 : 1;
+    text = `Estimated total: $${rate}/day × ${days} day${days === 1 ? '' : 's'} = $${(rate * days).toFixed(2)}`;
+  } else if (serviceType === 'Drop-In Visit') {
+    if (!distanceMilesInput.value) {
+      priceEstimateEl.hidden = true;
+      return;
+    }
+    const isFar = parseFloat(distanceMilesInput.value) >= 5;
+    const visitCount = Math.max(selectedSlots.size, 1);
+    const daySpan = (endDate && endDate !== startDate) ? nights + 1 : 1;
+    const totalVisits = visitCount * daySpan;
+    const extended = totalVisits >= 14;
+    const rates = extended ? DROP_IN_EXTENDED_RATES : DROP_IN_RATES;
+    const rate = (isFar ? rates.far : rates.near) + (isPuppy ? PUPPY_ADDON : 0);
+    text = `Estimated total: $${rate}/visit × ${totalVisits} visit${totalVisits === 1 ? '' : 's'} = $${(rate * totalVisits).toFixed(2)}`;
+  }
+
+  priceEstimateEl.textContent = text;
+  priceEstimateEl.hidden = !text;
+}
+
+// Pet's name/age are entered once here and mirrored into the Pet Profile
+// tab's matching fields so the client never has to type them twice.
+const realPetNameInput = document.getElementById('petName');
+const realPetAgeInput = document.getElementById('petAge');
+schedulePetNameInput.addEventListener('input', () => {
+  realPetNameInput.value = schedulePetNameInput.value;
+});
+schedulePetAgeInput.addEventListener('input', () => {
+  realPetAgeInput.value = schedulePetAgeInput.value;
+  updatePriceEstimate();
+});
 
 function formatDate(value) {
   if (!value) return '____________________';
@@ -1004,6 +1071,10 @@ bookingForm.addEventListener('submit', async (e) => {
   try {
     for (const requestDate of requestDates) {
       const body = { ...d, startDate: requestDate };
+      // A multi-date request creates one booking row per date, but should
+      // only notify Misti once (see notify-multi call below), not once per
+      // date -- suppress the server's automatic per-booking email here.
+      if (requestDates.length > 1) body.suppressEmail = true;
       const res = await fetch(`${BOOKING_API}/api/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1025,6 +1096,25 @@ bookingForm.addEventListener('submit', async (e) => {
           await fetch(`${BOOKING_API}/api/bookings/${bookingId}/photos`, { method: 'POST', body: photoData });
         } catch (err) {
           // photo upload failure shouldn't block the booking request
+        }
+      }
+    }
+
+    if (requestDates.length > 1) {
+      const successDates = dateResults.filter((r) => r.ok).map((r) => r.date);
+      if (successDates.length) {
+        try {
+          await fetch(`${BOOKING_API}/api/bookings/notify-multi`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ownerName: d.ownerName, ownerPhone: d.ownerPhone, ownerEmail: d.ownerEmail,
+              serviceType: d.serviceType, petInfo: d.petInfo, startTime: d.startTime,
+              dates: successDates,
+            }),
+          });
+        } catch {
+          // notification failure shouldn't block the booking flow
         }
       }
     }
@@ -1386,13 +1476,37 @@ rebookForm.addEventListener('submit', async (e) => {
   try {
     const results = [];
     for (const requestDate of requestDates) {
+      // A multi-date request creates one booking row per date, but should
+      // only notify Misti once (see notify-multi call below), not once per
+      // date -- suppress the server's automatic per-booking email here.
+      const reqBody = { ...body, startDate: requestDate };
+      if (requestDates.length > 1) reqBody.suppressEmail = true;
       const res = await fetch(`${BOOKING_API}/api/client-portal/${currentPortalData.clientId}/rebook`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...body, startDate: requestDate }),
+        body: JSON.stringify(reqBody),
       });
       const result = await res.json();
       results.push({ date: requestDate, ok: res.ok, error: result.error });
+    }
+    if (requestDates.length > 1) {
+      const successDates = results.filter((r) => r.ok).map((r) => r.date);
+      if (successDates.length) {
+        try {
+          await fetch(`${BOOKING_API}/api/bookings/notify-multi`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ownerName: currentPortalData.ownerName, ownerPhone: currentPortalData.ownerPhone,
+              ownerEmail: currentPortalData.ownerEmail, serviceType: body.serviceType,
+              petInfo: currentPortalData.petInfo, startTime: body.startTime,
+              dates: successDates,
+            }),
+          });
+        } catch {
+          // notification failure shouldn't block the booking flow
+        }
+      }
     }
     const failed = results.filter((r) => !r.ok);
     if (failed.length === results.length) {
