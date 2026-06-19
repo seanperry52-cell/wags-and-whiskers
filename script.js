@@ -1153,6 +1153,7 @@ bookingForm.addEventListener('submit', async (e) => {
     d.endDate = '';
   }
   const dateResults = [];
+  let networkFailed = false;
 
   // Reserve the request(s) with the booking system first — for overnight/day
   // care this checks the dates are still available before we proceed.
@@ -1213,7 +1214,12 @@ bookingForm.addEventListener('submit', async (e) => {
       renderTimeSlots();
     }
   } catch (err) {
-    // booking server unreachable — fall back to email-only flow
+    // The booking system itself never confirmed the request (network error,
+    // CORS rejection, etc.) -- nothing was saved server-side, so this must
+    // NOT be reported as success. The mailto fallback below still opens,
+    // but the status message has to make clear the client needs to actually
+    // send that email themselves, or the request is simply lost.
+    networkFailed = true;
   }
 
   const subject = `Booking Request: ${d.serviceType} - ${d.ownerName}`;
@@ -1245,11 +1251,21 @@ bookingForm.addEventListener('submit', async (e) => {
   }
 
   const failedDates = dateResults.filter((r) => !r.ok);
-  const statusMessage = failedDates.length
-    ? `Request sent for ${dateResults.length - failedDates.length} of ${dateResults.length} date(s). ` +
-      `Couldn't book: ${failedDates.map((f) => `${formatDate(f.date)} (${f.error})`).join('; ')}. Opening your email and contract now...`
-    : 'Request received! Opening your email and contract now...';
-  showBookingStatus(statusMessage, failedDates.length === dateResults.length ? 'error' : 'success');
+  let statusMessage;
+  let statusType;
+  if (networkFailed) {
+    statusMessage = "We couldn't reach our booking system just now, so your request was NOT saved. " +
+      'An email is opening below — please make sure you actually hit Send on it, or contact us directly, so your request isn\'t lost.';
+    statusType = 'error';
+  } else if (failedDates.length) {
+    statusMessage = `Request sent for ${dateResults.length - failedDates.length} of ${dateResults.length} date(s). ` +
+      `Couldn't book: ${failedDates.map((f) => `${formatDate(f.date)} (${f.error})`).join('; ')}. Opening your email and contract now...`;
+    statusType = failedDates.length === dateResults.length ? 'error' : 'success';
+  } else {
+    statusMessage = 'Request received! Opening your email and contract now...';
+    statusType = 'success';
+  }
+  showBookingStatus(statusMessage, statusType);
   window.location.href = mailtoLink;
 });
 
