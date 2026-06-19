@@ -1310,12 +1310,18 @@ const bookingTabsTrack = document.querySelector('.booking-tabs-track');
 const bookingTabOrder = ['details', 'schedule', 'pets', 'emergency', 'access'];
 
 function showBookingTab(name) {
-  const index = bookingTabOrder.indexOf(name);
   bookingTabs.forEach(tab => tab.classList.toggle('active', tab.dataset.bookingTab === name));
   bookingTabContents.forEach(content => {
-    content.toggleAttribute('inert', content.dataset.bookingTabContent !== name);
+    const isActive = content.dataset.bookingTabContent === name;
+    // `hidden` (display:none) guarantees no overlap regardless of any
+    // transform/overflow/zoom quirk on a given browser -- relying purely on
+    // the translateX slide + overflow:hidden trick was the cause of tab
+    // panels visibly overlapping on a real phone (each panel still took up
+    // layout space even off-screen, so anything that nudged the transform
+    // math even slightly let two panels show at once).
+    content.hidden = !isActive;
+    content.toggleAttribute('inert', !isActive);
   });
-  bookingTabsTrack.style.transform = `translateX(-${index * 100}%)`;
 }
 
 bookingTabs.forEach(tab => {
