@@ -771,8 +771,6 @@ function ratesTables() {
     <caption>Drop-Ins at Owner's House</caption>
     <tr><td>Drop-In 30 minutes &lt; 5 miles</td><td>$16.00</td></tr>
     <tr><td>Drop-In 30 minutes &gt; 5 miles</td><td>$18.00</td></tr>
-    <tr><td>Drop-In 60 minutes &lt; 5 miles</td><td>$26.00</td></tr>
-    <tr><td>Drop-In 60 minutes &gt; 5 miles</td><td>$28.00</td></tr>
     <tr><td>Additional Dog</td><td>+$8.00</td></tr>
     <tr><td>Puppy</td><td>+$4.00 to rate above</td></tr>
     <tr><td>Extended Rate 30 minutes (14+ visits) &lt; 5 miles</td><td>$15.00</td></tr>
