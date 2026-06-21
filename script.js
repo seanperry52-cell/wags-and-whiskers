@@ -901,11 +901,13 @@ function buildContractHtml(d) {
     visitTotal = `$${(rate * totalVisits).toFixed(2)}`;
   }
 
-  const dateRange = d.clientType === 'Ongoing'
+  const isOngoingClient = d.clientType === 'Ongoing';
+  const specificDateRange = (d.endDate && d.endDate !== d.startDate)
+    ? `${formatDate(d.startDate)} &ndash; ${formatDate(d.endDate)}`
+    : formatDate(d.startDate);
+  const dateRange = isOngoingClient
     ? `Ongoing &mdash; schedule based on availability<br><small>Preferred first date: ${formatDate(d.startDate)}</small>`
-    : (d.endDate && d.endDate !== d.startDate
-      ? `${formatDate(d.startDate)} &ndash; ${formatDate(d.endDate)}`
-      : formatDate(d.startDate));
+    : specificDateRange;
 
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -915,13 +917,20 @@ function buildContractHtml(d) {
 
   const serviceTypeChecks = `${checkbox(isDropIn)} Drop-in &nbsp;&nbsp; ${checkbox(isOvernight)} Overnight &nbsp;&nbsp; ${checkbox(isDayCare)} Daycare &nbsp;&nbsp; ${checkbox(false)} Other: <span class="blank-line"></span>`;
 
+  // "As agreed on by both parties" only applies to the time field(s) for
+  // whichever service type this booking actually is -- an Ongoing Overnight
+  // client gets it checked on Drop-off/Pick-up but not on Drop-in Time,
+  // and vice versa for an Ongoing Drop-In client.
+  const dropOffPickupAsAgreed = ` &nbsp;&nbsp; ${checkbox(isOngoingClient && (isOvernight || isDayCare))} As agreed on by both parties`;
+  const dropInTimeAsAgreed = ` &nbsp;&nbsp; ${checkbox(isOngoingClient && isDropIn)} As agreed on by both parties`;
+
   const dropOffPickup = (isOvernight || isDayCare)
-    ? `<div class="field"><label>Drop-off Time:</label> ${formatTime(d.startTime)} &nbsp;&nbsp; <label>Pick-up Time:</label> ${formatTime(d.endTime)}</div>`
-    : `<div class="field"><label>Drop-off Time:</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Pick-up Time:</label> <span class="blank-line"></span></div>`;
+    ? `<div class="field"><label>Drop-off Time:</label> ${formatTime(d.startTime)} &nbsp;&nbsp; <label>Pick-up Time:</label> ${formatTime(d.endTime)}${dropOffPickupAsAgreed}</div>`
+    : `<div class="field"><label>Drop-off Time:</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Pick-up Time:</label> <span class="blank-line"></span>${dropOffPickupAsAgreed}</div>`;
 
   const dropInTimeRow = isDropIn
-    ? `<div class="field"><label>Drop-in Time(s):</label> ${formatTimesList(d.startTime)} &nbsp;&nbsp; <label>Length of Drop-in:</label> 30 minutes each</div>`
-    : `<div class="field"><label>Drop-in Time(s):</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Length of Drop-in:</label> <span class="blank-line"></span></div>`;
+    ? `<div class="field"><label>Drop-in Time(s):</label> ${formatTimesList(d.startTime)} &nbsp;&nbsp; <label>Length of Drop-in:</label> 30 minutes each${dropInTimeAsAgreed}</div>`
+    : `<div class="field"><label>Drop-in Time(s):</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Length of Drop-in:</label> <span class="blank-line"></span>${dropInTimeAsAgreed}</div>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1010,8 +1019,8 @@ function buildContractHtml(d) {
     <div class="field"><label>Emergency Contact Name:</label> ${d.emergencyName || blankLine} &nbsp;&nbsp; <label>Phone:</label> ${d.emergencyPhone || blankLine}</div>
 
     <h3 class="sub-h">Service Preferences</h3>
-    <div class="field">Days Needed: ${checkbox(false)} M &nbsp; ${checkbox(false)} T &nbsp; ${checkbox(false)} W &nbsp; ${checkbox(false)} Th &nbsp; ${checkbox(false)} F &nbsp; ${checkbox(false)} Sa &nbsp; ${checkbox(false)} Su</div>
-    <div class="field"><label>Dates Needed:</label> ${dateRange}</div>
+    <div class="field">Days Needed: ${checkbox(false)} M &nbsp; ${checkbox(false)} T &nbsp; ${checkbox(false)} W &nbsp; ${checkbox(false)} Th &nbsp; ${checkbox(false)} F &nbsp; ${checkbox(false)} Sa &nbsp; ${checkbox(false)} Su &nbsp; ${checkbox(isOngoingClient)} As agreed on by both parties</div>
+    <div class="field"><label>Dates Needed:</label> ${isOngoingClient ? blankLine : specificDateRange} &nbsp; ${checkbox(isOngoingClient)} As agreed on by both parties</div>
     <div class="field">Service Type: ${serviceTypeChecks}</div>
     ${dropOffPickup}
     ${dropInTimeRow}
