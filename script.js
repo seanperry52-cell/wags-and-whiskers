@@ -1147,22 +1147,28 @@ bookingForm.addEventListener('submit', async (e) => {
   }
 
   let requestDates = [d.startDate];
-  if (ongoing) {
-    d.endDate = '';
-    d.startTime = '';
-  } else if (DROP_IN_SERVICES.has(d.serviceType)) {
-    if (selectedSlots.size === 0) {
+  if (DROP_IN_SERVICES.has(d.serviceType)) {
+    if (!ongoing && selectedSlots.size === 0) {
       showBookingStatus('Please choose at least one time slot for your visit.', 'error');
       return;
     }
-    d.startTime = [...selectedSlots].sort().join(',');
-    // A drop-in's End Date means "request these same times every day in
-    // this range," not a single multi-night stay -- each day becomes its
-    // own independent booking/approval, so the per-booking endDate itself
-    // is cleared below.
-    if (d.endDate && d.endDate !== d.startDate) {
-      requestDates = dateRangeArray(d.startDate, d.endDate);
+    if (selectedSlots.size > 0) {
+      d.startTime = [...selectedSlots].sort().join(',');
+      // A drop-in's End Date means "request these same times every day in
+      // this range," not a single multi-night stay -- each day becomes its
+      // own independent booking/approval, so the per-booking endDate itself
+      // is cleared below. This still applies for an Ongoing client who picked
+      // a concrete first-visit range -- it gets blocked like a real visit;
+      // only later/future visits are arranged ad hoc.
+      if (d.endDate && d.endDate !== d.startDate) {
+        requestDates = dateRangeArray(d.startDate, d.endDate);
+      }
+    } else {
+      // Ongoing client who didn't pick any times yet -- no fixed schedule.
+      d.startTime = '';
     }
+    d.endDate = '';
+  } else if (ongoing && (!d.endDate || d.endDate === d.startDate)) {
     d.endDate = '';
   }
   const dateResults = [];
