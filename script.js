@@ -2034,7 +2034,7 @@ function bookingCardHtml(b) {
   const dates = b.end_date && b.end_date !== b.start_date
     ? `${formatDate(b.start_date)} – ${formatDate(b.end_date)}`
     : formatDate(b.start_date);
-  const cancelUi = CANCELLABLE_STATUSES.has(b.status) ? `
+  const cancelUi = (CANCELLABLE_STATUSES.has(b.status) && b.source !== 'calendar') ? `
     <div class="portal-cancel-actions">
       <button type="button" class="btn btn-outline btn-cancel-reservation" data-booking-id="${b.id}" data-start-date="${b.start_date}">Cancel Reservation</button>
     </div>
