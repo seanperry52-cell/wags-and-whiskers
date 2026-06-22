@@ -887,6 +887,7 @@ function buildContractHtml(d) {
     dailyTotal = `$${rate.toFixed(2)}`;
     visitTotal = `$${(rate * days).toFixed(2)}`;
   } else if (isDropIn) {
+    const distanceKnown = d.distanceMiles !== undefined && d.distanceMiles !== '' && !Number.isNaN(parseFloat(d.distanceMiles));
     const isFar = parseFloat(d.distanceMiles) >= 5;
     const daySpan = (d.endDate && d.endDate !== d.startDate) ? nights + 1 : 1;
     const totalVisits = visitCount * daySpan;
@@ -895,8 +896,13 @@ function buildContractHtml(d) {
     // Flat per-visit rate -- covers the whole household at that visit,
     // regardless of how many pets are there (per-dog addons only apply
     // to Overnight/Day Care, where each pet occupies its own space).
-    rate = (isFar ? rates.far : rates.near) + (isPuppy ? PUPPY_ADDON : 0);
-    unit = `per visit (30 min, ${isFar ? '5+' : 'under 5'} mi from Misti's home${extended ? ', extended rate (14+ visits in this request)' : ''}${isPuppy ? ' + puppy add-on' : ''})`;
+    // If the driving-distance lookup never ran (e.g. the booking API was
+    // unreachable), don't silently bill the cheaper near rate -- flag it
+    // so the rate gets confirmed manually instead of being wrong unnoticed.
+    rate = (distanceKnown ? (isFar ? rates.far : rates.near) : rates.near) + (isPuppy ? PUPPY_ADDON : 0);
+    unit = distanceKnown
+      ? `per visit (30 min, ${isFar ? '5+' : 'under 5'} mi from Misti's home${extended ? ', extended rate (14+ visits in this request)' : ''}${isPuppy ? ' + puppy add-on' : ''})`
+      : `per visit (30 min) -- DISTANCE UNKNOWN, CONFIRM RATE BEFORE SENDING${isPuppy ? ' + puppy add-on' : ''}`;
     dailyTotal = daySpan > 1 ? `$${(rate * visitCount).toFixed(2)}` : '';
     visitTotal = `$${(rate * totalVisits).toFixed(2)}`;
   }
