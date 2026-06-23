@@ -1173,6 +1173,11 @@ bookingForm.addEventListener('submit', async (e) => {
   }
   const dateResults = [];
   let networkFailed = false;
+  // The bookings schema has no concept of a non-contiguous date set on one
+  // row, so a multi-date request still creates one row per date -- but they
+  // all share this groupId so the admin UI can show/approve them as one
+  // request instead of N separate ones.
+  const groupId = requestDates.length > 1 ? `grp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` : null;
 
   // Reserve the request(s) with the booking system first — for overnight/day
   // care this checks the dates are still available before we proceed.
@@ -1183,6 +1188,7 @@ bookingForm.addEventListener('submit', async (e) => {
       // only notify Misti once (see notify-multi call below), not once per
       // date -- suppress the server's automatic per-booking email here.
       if (requestDates.length > 1) body.suppressEmail = true;
+      if (groupId) body.groupId = groupId;
       const res = await fetch(`${BOOKING_API}/api/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1616,6 +1622,11 @@ rebookForm.addEventListener('submit', async (e) => {
   }
 
   showRebookStatus('Sending your request...', '');
+  // The bookings schema has no concept of a non-contiguous date set on one
+  // row, so a multi-date request still creates one row per date -- but they
+  // all share this groupId so the admin UI can show/approve them as one
+  // request instead of N separate ones.
+  const groupId = requestDates.length > 1 ? `grp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` : null;
   try {
     const results = [];
     for (const requestDate of requestDates) {
@@ -1624,6 +1635,7 @@ rebookForm.addEventListener('submit', async (e) => {
       // date -- suppress the server's automatic per-booking email here.
       const reqBody = { ...body, startDate: requestDate };
       if (requestDates.length > 1) reqBody.suppressEmail = true;
+      if (groupId) reqBody.groupId = groupId;
       const res = await fetch(`${BOOKING_API}/api/client-portal/${currentPortalData.clientId}/rebook`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
