@@ -2042,39 +2042,130 @@ function cancellationPolicyInfo(startDateStr) {
 
 const CANCELLABLE_STATUSES = new Set(['pending', 'approved']);
 
-function bookingCardHtml(b) {
-  const dates = b.end_date && b.end_date !== b.start_date
-    ? `${formatDate(b.start_date)} – ${formatDate(b.end_date)}`
-    : formatDate(b.start_date);
-  const cancelUi = (CANCELLABLE_STATUSES.has(b.status) && b.source !== 'calendar') ? `
+function nextCalendarDay(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// "Drop-off/Pick-up" wording only makes sense for Overnight/Day Care (you
+// drop your pet off, pick them up later) -- a Drop-In Visit is a short visit
+// at the home, so it's just listed as a plain time (or times).
+function timesNoteHtml(b) {
+  if (!b.start_time) return '';
+  const isDropIn = b.service_type === 'Drop-In Visit';
+  const text = (!isDropIn && b.end_time)
+    ? 'Drop-off ' + formatTime(b.start_time) + ' / Pick-up ' + formatTime(b.end_time)
+    : formatTimesList(b.start_time);
+  return `<br /><small>${text}</small>`;
+}
+
+function bookingCardHtml(group) {
+  const sorted = group.slice().sort((a, c) => a.start_date.localeCompare(c.start_date));
+  const first = sorted[0];
+  const isMulti = sorted.length > 1;
+  const dates = isMulti
+    ? sorted.map((b) => (b.end_date && b.end_date !== b.start_date ? `${formatDate(b.start_date)} – ${formatDate(b.end_date)}` : formatDate(b.start_date))).join(', ')
+    : (first.end_date && first.end_date !== first.start_date ? `${formatDate(first.start_date)} – ${formatDate(first.end_date)}` : formatDate(first.start_date));
+  const multiBadge = isMulti ? ` <span class="portal-status">${sorted.length} dates</span>` : '';
+  const cancelUi = (CANCELLABLE_STATUSES.has(first.status) && first.source !== 'calendar' && !isMulti) ? `
     <div class="portal-cancel-actions">
-      <button type="button" class="btn btn-outline btn-cancel-reservation" data-booking-id="${b.id}" data-start-date="${b.start_date}">Cancel Reservation</button>
+      <button type="button" class="btn btn-outline btn-cancel-reservation" data-booking-id="${first.id}" data-start-date="${first.start_date}">Cancel Reservation</button>
     </div>
-    <div class="portal-cancel-confirm" data-booking-id="${b.id}" hidden></div>
+    <div class="portal-cancel-confirm" data-booking-id="${first.id}" hidden></div>
   ` : '';
   return `
     <div class="portal-booking-card">
       <div class="portal-booking-row">
-        <span><strong>${b.service_type}</strong><br />${dates}</span>
-        <span class="portal-status portal-status-${b.status}">${b.status}</span>
+        <span><strong>${first.service_type}</strong>${multiBadge}<br />${dates}${timesNoteHtml(first)}</span>
+        <span class="portal-status portal-status-${first.status}">${first.status}</span>
       </div>
       ${cancelUi}
     </div>
   `;
 }
 
+// A recurring drop-in client otherwise shows one near-identical card per
+// individual visit, real bookings and calendar-only visits alike -- group
+// real booking rows by matching service/status/times (handles a multi-date
+// request submitted as several separate rows), and collapse calendar-only
+// visits by day then by consecutive same-visit-count days into a range,
+// mirroring the same idea already used in the admin dashboard.
+function groupPortalBookings(bookings) {
+  const real = bookings.filter((b) => b.source !== 'calendar');
+  const cal = bookings.filter((b) => b.source === 'calendar');
+  const groups = [];
+
+  const realKey = (b) => [b.service_type, b.status, b.start_time || '', b.end_time || ''].join('|');
+  const seenRealKeys = new Set();
+  for (const b of real) {
+    const key = realKey(b);
+    if (seenRealKeys.has(key)) continue;
+    seenRealKeys.add(key);
+    groups.push(real.filter((x) => realKey(x) === key));
+  }
+
+  const byDate = new Map();
+  for (const b of cal) {
+    const key = `${b.start_date}|${b.service_type}|${b.status}`;
+    if (!byDate.has(key)) byDate.set(key, { start_date: b.start_date, end_date: b.start_date, service_type: b.service_type, status: b.status, visits: [] });
+    byDate.get(key).visits.push(b);
+  }
+  const days = [...byDate.values()].sort((a, c) => a.start_date.localeCompare(c.start_date));
+  for (const day of days) day.visits.sort((a, c) => (a.start_time || '').localeCompare(c.start_time || ''));
+
+  const ranges = [];
+  for (const day of days) {
+    const prev = ranges[ranges.length - 1];
+    if (prev && nextCalendarDay(prev.end_date) === day.start_date && prev.visits.length / prev.dayCount === day.visits.length
+        && prev.service_type === day.service_type && prev.status === day.status) {
+      prev.end_date = day.start_date;
+      prev.dayCount += 1;
+      prev.visits.push(...day.visits);
+    } else {
+      ranges.push({ ...day, dayCount: 1, visits: [...day.visits] });
+    }
+  }
+  for (const r of ranges) {
+    // Represent the whole range as one synthetic booking per date in it, so
+    // bookingCardHtml's existing multi-date listing logic just works -- one
+    // representative entry per day carrying that day's combined times.
+    const visitsPerDay = r.visits.length / r.dayCount;
+    const byStartDate = new Map();
+    for (const v of r.visits) {
+      if (!byStartDate.has(v.start_date)) byStartDate.set(v.start_date, []);
+      byStartDate.get(v.start_date).push(v);
+    }
+    const synthetic = [...byStartDate.entries()].map(([start_date, visits]) => ({
+      ...visits[0],
+      start_date,
+      end_date: visits[0].end_date,
+      start_time: visits.map((v) => v.start_time).filter(Boolean).join(','),
+      end_time: visitsPerDay > 1 ? null : visits[0].end_time,
+      source: 'calendar',
+    }));
+    groups.push(synthetic);
+  }
+
+  return groups;
+}
+
 // Server already returns every booking on file for the client (no date or
-// status filter) -- this just groups them so upcoming/in-progress visits
-// are clearly separated from history instead of one undifferentiated list.
+// status filter) -- this groups near-duplicate visits (see
+// groupPortalBookings()) and separates upcoming/in-progress from history.
 function renderPortalBookings(bookings) {
   if (!bookings || !bookings.length) {
     portalBookingsBody.innerHTML = '<p>No bookings yet.</p>';
     return;
   }
+  const groupedBookings = groupPortalBookings(bookings);
+  const groupLatestDate = (g) => g.reduce((max, b) => (b.start_date > max ? b.start_date : max), g[0].start_date);
+  const groupEarliestDate = (g) => g.reduce((min, b) => (b.start_date < min ? b.start_date : min), g[0].start_date);
+
   const today = new Date().toISOString().slice(0, 10);
-  const isUpcoming = (b) => (b.end_date || b.start_date) >= today;
-  const upcoming = bookings.filter(isUpcoming).sort((a, b) => a.start_date.localeCompare(b.start_date));
-  const past = bookings.filter((b) => !isUpcoming(b)).sort((a, b) => b.start_date.localeCompare(a.start_date));
+  const isUpcoming = (g) => groupLatestDate(g) >= today;
+  const upcoming = groupedBookings.filter(isUpcoming).sort((a, b) => groupEarliestDate(a).localeCompare(groupEarliestDate(b)));
+  const past = groupedBookings.filter((g) => !isUpcoming(g)).sort((a, b) => groupEarliestDate(b).localeCompare(groupEarliestDate(a)));
 
   let html = '';
   if (upcoming.length) {
