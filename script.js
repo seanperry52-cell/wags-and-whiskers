@@ -1828,6 +1828,18 @@ function isPetProfileSection(sectionTitle) {
   return /dog profile|pet profile|cat profile/i.test(sectionTitle);
 }
 
+// "Dog Profile - Lenny" -> "Lenny"; "Pet Profile" -> "Pet".
+function petNameFromSection(sectionTitle) {
+  const m = String(sectionTitle || '').match(/-\s*(.+)$/);
+  if (m) return m[1].trim();
+  return String(sectionTitle || '').replace(/profile/i, '').trim();
+}
+
+function petProfileSectionTitles() {
+  const sections = currentPortalData?.sections || {};
+  return Object.keys(sections).filter(isPetProfileSection);
+}
+
 function updateWelcomeAvatar() {
   const data = currentPortalData;
   const avatar = data?.profilePhoto || data?.photos?.[0];
@@ -1903,7 +1915,16 @@ async function removeProfilePic() {
 function renderPhotosHtml() {
   const data = currentPortalData;
   if (!data.clientId) return '';
-  const photos = data.photos || [];
+  const allPhotos = data.photos || [];
+  const photoPets = data.photoPets || {};
+  const petName = petNameFromSection(activeOverviewSection);
+  const singlePet = petProfileSectionTitles().length <= 1;
+  // Show only this pet's photos; untagged photos show for single-pet households.
+  const photos = allPhotos.filter((p) => {
+    const assigned = photoPets[p];
+    if (assigned) return assigned === petName;
+    return singlePet;
+  });
   const limit = data.photoLimit || 2;
   const photosHtml = photos.map((p) => `
     <div class="portal-photo">
@@ -1911,12 +1932,12 @@ function renderPhotosHtml() {
       <button type="button" class="portal-photo-remove" data-path="${escapeAttr(p)}">&times;</button>
     </div>
   `).join('');
-  const addHtml = photos.length < limit
+  const addHtml = allPhotos.length < limit
     ? `<label class="portal-photo-add">+<input type="file" accept="image/*" multiple hidden id="portalPhotoInput" /></label>`
     : '';
   return `
     <div class="portal-section">
-      <h4>Pet Photos</h4>
+      <h4>${petName ? escapeAttr(petName) + "&rsquo;s Photos" : 'Pet Photos'}</h4>
       <div class="portal-photos">${photosHtml}${addHtml}</div>
       <p id="portalPhotoStatus" class="booking-status" hidden></p>
     </div>
@@ -1927,6 +1948,10 @@ async function uploadClientPhotos(files) {
   if (!files || !files.length || !currentPortalData?.clientId) return;
   const formData = new FormData();
   for (const file of files) formData.append('photos', file);
+  // Tag the upload with the pet whose profile the client is currently on, so
+  // it lands on that pet's profile rather than a shared bucket.
+  const pet = isPetProfileSection(activeOverviewSection) ? petNameFromSection(activeOverviewSection) : '';
+  if (pet) formData.append('pet', pet);
   const status = document.getElementById('portalPhotoStatus');
   if (status) { status.textContent = 'Uploading...'; status.hidden = false; }
   try {
@@ -1937,6 +1962,7 @@ async function uploadClientPhotos(files) {
     if (!res.ok) throw new Error('bad response');
     const result = await res.json();
     currentPortalData.photos = result.photos;
+    if (result.photoPets) currentPortalData.photoPets = result.photoPets;
     if (result.limit) currentPortalData.photoLimit = result.limit;
     renderOverviewBody();
   } catch {
