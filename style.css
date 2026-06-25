@@ -1404,13 +1404,13 @@ input:focus, select:focus, textarea:focus {
 }
 
 .portal-booking-row span:first-child {
-  flex-shrink: 0;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .portal-booking-row span:last-child {
-  min-width: 0;
+  flex-shrink: 0;
   text-align: right;
-  word-break: break-word;
 }
 
 .portal-edit-bar {
