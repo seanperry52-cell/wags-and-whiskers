@@ -114,17 +114,27 @@ function updateCalendarTimePanel() {
 // date range; clicking the start date again clears a previously-set end
 // date back to a single day; any other click starts a fresh selection.
 function selectCalendarDate(dateStr) {
-  if (dateStr === selectedCalendarDate) {
-    if (endDateInput.value) {
-      endDateInput.value = '';
-      endDateInput.dispatchEvent(new Event('change'));
-    }
-  } else if (!selectedCalendarDate || selectedCalendarEndDate || dateStr < selectedCalendarDate) {
+  if (selectedCalendarEndDate || !selectedCalendarDate) {
+    // Nothing picked yet, or a full range is already set -- this click
+    // starts a fresh selection with the clicked day as the (lone) start.
     startDateInput.value = dateStr;
     endDateInput.value = '';
     startDateInput.dispatchEvent(new Event('change'));
+  } else if (dateStr === selectedCalendarDate) {
+    // Clicking the single selected day again clears the selection.
+    startDateInput.value = '';
+    endDateInput.value = '';
+    startDateInput.dispatchEvent(new Event('change'));
   } else {
-    endDateInput.value = dateStr;
+    // One start is set and a different day was clicked -- form a range and
+    // auto-order the two clicks, so it doesn't matter whether the earlier
+    // or later date was picked first (clients shouldn't have to pick the
+    // "end" before the "start").
+    const start = dateStr < selectedCalendarDate ? dateStr : selectedCalendarDate;
+    const end = dateStr < selectedCalendarDate ? selectedCalendarDate : dateStr;
+    startDateInput.value = start;
+    endDateInput.value = end;
+    startDateInput.dispatchEvent(new Event('change'));
     endDateInput.dispatchEvent(new Event('change'));
   }
   updateCalendarTimePanel();
@@ -1268,12 +1278,8 @@ bookingForm.addEventListener('submit', async (e) => {
   const body = lines.join('\n');
   const mailtoLink = `mailto:wagsandwhiskersbymistillc@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
-  // Open the pre-filled, printable contract in a new tab
-  const contractWin = window.open('', '_blank');
-  if (contractWin) {
-    contractWin.document.write(buildContractHtml(d));
-    contractWin.document.close();
-  }
+  // The pre-filled contract is intentionally NOT shown to the client here --
+  // they cannot view it until Misti reviews and approves the request.
 
   const failedDates = dateResults.filter((r) => !r.ok);
   let statusMessage;
@@ -1284,14 +1290,23 @@ bookingForm.addEventListener('submit', async (e) => {
     statusType = 'error';
   } else if (failedDates.length) {
     statusMessage = `Request sent for ${dateResults.length - failedDates.length} of ${dateResults.length} date(s). ` +
-      `Couldn't book: ${failedDates.map((f) => `${formatDate(f.date)} (${f.error})`).join('; ')}. Opening your email and contract now...`;
+      `Couldn't book: ${failedDates.map((f) => `${formatDate(f.date)} (${f.error})`).join('; ')}. Please try those dates again or contact us.`;
     statusType = failedDates.length === dateResults.length ? 'error' : 'success';
   } else {
-    statusMessage = 'Request received! Opening your email and contract now...';
+    statusMessage = 'Booking submitted!';
     statusType = 'success';
   }
   showBookingStatus(statusMessage, statusType);
-  window.location.href = mailtoLink;
+  if (networkFailed) {
+    // The server never received the request -- keep the pre-filled email as a
+    // fallback so the booking isn't silently lost.
+    window.location.href = mailtoLink;
+  } else if (!failedDates.length) {
+    // Full success: the booking is saved and the server emails Misti
+    // automatically, so show a clear confirmation screen (no email draft).
+    bookingForm.hidden = true;
+    bookingConfirmation.hidden = false;
+  }
 });
 
 // ── Footer year ─────────────────────────────────────────────────────────────
@@ -1300,14 +1315,21 @@ document.getElementById('year').textContent = new Date().getFullYear();
 // ── Booking modal ────────────────────────────────────────────────────────────
 const bookingModal = document.getElementById('bookingModal');
 const bookingModalClose = document.getElementById('bookingModalClose');
+const bookingConfirmation = document.getElementById('bookingConfirmation');
+document.getElementById('bookingConfirmationDone')?.addEventListener('click', () => location.reload());
 
 function openBookingModal() {
+  if (bookingConfirmation) bookingConfirmation.hidden = true;
+  bookingForm.hidden = false;
   bookingModal.hidden = false;
   document.body.style.overflow = 'hidden';
   showBookingTab('details');
 }
 
 function closeBookingModal() {
+  // After a successful submission the confirmation screen is showing -- reload
+  // so the next booking starts from a clean, empty form.
+  if (bookingConfirmation && !bookingConfirmation.hidden) { location.reload(); return; }
   bookingModal.hidden = true;
   document.body.style.overflow = '';
 }
@@ -1512,7 +1534,7 @@ async function renderRebookTimeSlots() {
   }
   rebookDropinSlots.innerHTML = '<p class="slots-loading">Loading times…</p>';
   try {
-    const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${date}`);
+    const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${date}&clientId=${encodeURIComponent(currentPortalData?.clientId || '')}`);
     if (!res.ok) throw new Error('bad response');
     const data = await res.json();
     rebookDropinSlots.innerHTML = '';

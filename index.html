@@ -714,7 +714,7 @@
         <p id="bookingStatus" class="booking-status" hidden></p>
 
         <button type="submit" class="btn btn-primary btn-submit">Send Booking Request</button>
-        <p class="booking-note">This will open your email app with a pre-filled message to <strong>wagsandwhiskersbymistillc@gmail.com</strong>, and open a pre-filled service contract you can print and sign.</p>
+        <p class="booking-note">This sends your request straight to Misti. She&rsquo;ll review it and send your service contract once your booking is approved.</p>
         <div class="booking-tab-nav">
           <button type="button" class="btn btn-outline booking-prev">← Back</button>
           <span></span>
@@ -724,6 +724,14 @@
         </div>
         </div>
       </form>
+
+      <div id="bookingConfirmation" hidden style="text-align:center; padding:2.5rem 1.5rem;">
+        <div style="width:72px;height:72px;border-radius:50%;background:#d6ecd9;color:#4a8a5a;font-size:2.4rem;line-height:72px;margin:0 auto 1rem;">&#10003;</div>
+        <h3 style="margin:0 0 0.6rem; font-size:1.5rem;">Booking submitted!</h3>
+        <p style="margin:0 auto 0.8rem; max-width:30rem;">Thank you! Your request has been sent to Misti. She&rsquo;ll review it and confirm with you soon &mdash; please keep an eye on your email.</p>
+        <p style="margin:0 auto 1.4rem; max-width:30rem; font-size:0.9rem; color:#666;">Once Misti approves your request, she&rsquo;ll send you the service contract to review and sign.</p>
+        <button type="button" class="btn btn-primary" id="bookingConfirmationDone">Done</button>
+      </div>
     </div>
   </div>
 
