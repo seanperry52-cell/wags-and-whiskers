@@ -2553,4 +2553,38 @@ function setupStack(stack, prevBtn, nextBtn, { flip = true } = {}) {
 }
 
 setupStack(document.getElementById('reviewsTrack'), document.querySelector('.reviews-prev'), document.querySelector('.reviews-next'), { flip: false });
-setupStack(document.getElementById('photosTrack'), document.querySelector('.photos-prev'), document.querySelector('.photos-next'));
+// ── Curated client photos ────────────────────────────────────────────────────
+// Pulls the photos Misti has featured in the admin (clients.featured_photos).
+// If any come back we swap the friendly placeholders for the real pet photos;
+// otherwise the placeholders stay. The card stack is initialised *after* the
+// swap so it tracks the cards actually in the DOM.
+async function loadSitePhotos() {
+  const track = document.getElementById('photosTrack');
+  if (!track) return;
+  let photos = [];
+  try {
+    const res = await fetch(`${BOOKING_API}/api/site-photos`);
+    if (res.ok) photos = await res.json();
+  } catch {
+    // gallery unavailable — keep the placeholders
+  }
+  if (Array.isArray(photos) && photos.length) {
+    track.innerHTML = photos.map(ph => {
+      const caption = ph.petName ? `${ph.petName} says hi! 🐾` : 'One of our happy clients! 🐾';
+      return `
+      <div class="review-card photo-card">
+        <div class="review-card-inner">
+          <div class="review-card-front" style="padding:0; overflow:hidden;">
+            <img src="${BOOKING_API}${ph.url}" alt="A happy client pet" loading="lazy" style="width:100%; height:100%; object-fit:cover; border-radius:var(--radius);" />
+          </div>
+          <div class="review-card-back photo-placeholder">
+            <span class="photo-icon">📸</span>
+            <p>${caption}</p>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  setupStack(track, document.querySelector('.photos-prev'), document.querySelector('.photos-next'));
+}
+loadSitePhotos();
