@@ -1481,6 +1481,8 @@ input:focus, select:focus, textarea:focus {
 .portal-cancel-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
   margin-top: 0.5rem;
 }
 
@@ -1507,6 +1509,42 @@ input:focus, select:focus, textarea:focus {
 }
 
 .portal-cancel-confirm-actions .btn {
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+}
+
+.portal-change-form {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid #eee;
+}
+
+.portal-change-title { margin: 0 0 0.5rem; font-size: 0.9rem; font-weight: 600; }
+
+.portal-change-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+  max-width: 240px;
+}
+
+.portal-change-field input {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #d9c9b6;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.portal-change-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  margin-top: 0.4rem;
+}
+
+.portal-change-actions .btn {
   padding: 0.45rem 1rem;
   font-size: 0.85rem;
 }

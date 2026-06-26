@@ -2116,9 +2116,23 @@ function bookingCardHtml(group) {
     ? sorted.map((b) => (b.end_date && b.end_date !== b.start_date ? `${formatDate(b.start_date)} – ${formatDate(b.end_date)}` : formatDate(b.start_date))).join(', ')
     : (first.end_date && first.end_date !== first.start_date ? `${formatDate(first.start_date)} – ${formatDate(first.end_date)}` : formatDate(first.start_date));
   const multiBadge = isMulti ? ` <span class="portal-status">${sorted.length} dates</span>` : '';
-  const cancelUi = (CANCELLABLE_STATUSES.has(first.status) && first.source !== 'calendar' && !isMulti) ? `
+  const canModify = CANCELLABLE_STATUSES.has(first.status) && first.source !== 'calendar' && !isMulti;
+  const hasRange = first.end_date && first.end_date !== first.start_date;
+  const minDate = new Date().toISOString().slice(0, 10);
+  const cancelUi = canModify ? `
     <div class="portal-cancel-actions">
+      <button type="button" class="btn btn-outline btn-change-dates" data-booking-id="${first.id}">Change Dates</button>
       <button type="button" class="btn btn-outline btn-cancel-reservation" data-booking-id="${first.id}" data-start-date="${first.start_date}">Cancel Reservation</button>
+    </div>
+    <div class="portal-change-form" data-booking-id="${first.id}" hidden>
+      <p class="portal-change-title">Request ${hasRange ? 'new dates' : 'a new date'}:</p>
+      <label class="portal-change-field">${hasRange ? 'Start date' : 'New date'}<input type="date" class="change-start-date" value="${first.start_date}" min="${minDate}" /></label>
+      ${hasRange ? `<label class="portal-change-field">End date<input type="date" class="change-end-date" value="${first.end_date}" min="${minDate}" /></label>` : ''}
+      <p class="change-status booking-status" hidden></p>
+      <div class="portal-change-actions">
+        <button type="button" class="btn btn-outline btn-change-cancel">Never mind</button>
+        <button type="button" class="btn btn-primary btn-change-submit" data-booking-id="${first.id}">Send request to Misti</button>
+      </div>
     </div>
     <div class="portal-cancel-confirm" data-booking-id="${first.id}" hidden></div>
   ` : '';
@@ -2246,10 +2260,61 @@ portalBookingsBody.addEventListener('click', async (e) => {
   const keepBtn = e.target.closest('.btn-keep-reservation');
   if (keepBtn) {
     const confirmPanel = keepBtn.closest('.portal-cancel-confirm');
-    const cancelActions = confirmPanel.previousElementSibling;
     confirmPanel.hidden = true;
     confirmPanel.innerHTML = '';
-    cancelActions.querySelector('.btn-cancel-reservation').hidden = false;
+    const card = keepBtn.closest('.portal-booking-card');
+    const reCancelBtn = card && card.querySelector('.btn-cancel-reservation');
+    if (reCancelBtn) reCancelBtn.hidden = false;
+    return;
+  }
+
+  // Change-dates: reveal the inline form
+  const changeBtn = e.target.closest('.btn-change-dates');
+  if (changeBtn) {
+    const { bookingId } = changeBtn.dataset;
+    const form = portalBookingsBody.querySelector(`.portal-change-form[data-booking-id="${bookingId}"]`);
+    if (form) form.hidden = false;
+    changeBtn.hidden = true;
+    return;
+  }
+
+  // Change-dates: dismiss the form without sending
+  const changeCancelBtn = e.target.closest('.btn-change-cancel');
+  if (changeCancelBtn) {
+    const form = changeCancelBtn.closest('.portal-change-form');
+    if (form) form.hidden = true;
+    const card = changeCancelBtn.closest('.portal-booking-card');
+    const reShowBtn = card && card.querySelector('.btn-change-dates');
+    if (reShowBtn) reShowBtn.hidden = false;
+    return;
+  }
+
+  // Change-dates: submit the request to Misti
+  const changeSubmitBtn = e.target.closest('.btn-change-submit');
+  if (changeSubmitBtn) {
+    const { bookingId } = changeSubmitBtn.dataset;
+    const form = changeSubmitBtn.closest('.portal-change-form');
+    const startDate = form.querySelector('.change-start-date')?.value || '';
+    const endEl = form.querySelector('.change-end-date');
+    const endDate = endEl ? endEl.value : undefined;
+    const status = form.querySelector('.change-status');
+    const setStatus = (msg) => { if (status) { status.textContent = msg; status.hidden = false; } };
+    if (!startDate) { setStatus('Please choose a new date.'); return; }
+    if (endDate !== undefined && endDate && endDate < startDate) { setStatus('End date must be on or after the start date.'); return; }
+    setStatus('Sending…');
+    changeSubmitBtn.disabled = true;
+    try {
+      const body = { startDate };
+      if (endDate !== undefined) body.endDate = endDate;
+      const res = await fetch(`${BOOKING_API}/api/client-portal/bookings/${bookingId}/change-request`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('bad response');
+      form.innerHTML = "<p>✅ Your change request has been sent to Misti. She'll review it and confirm by email — your current reservation stays in place until then.</p>";
+    } catch (err) {
+      setStatus('Something went wrong sending your request. Please try again or contact us directly.');
+      changeSubmitBtn.disabled = false;
+    }
     return;
   }
 
