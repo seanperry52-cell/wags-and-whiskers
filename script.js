@@ -2488,18 +2488,29 @@ async function loadSiteReviews() {
   if (!track) return;
   try {
     const res = await fetch(`${BOOKING_API}/api/reviews`);
-    if (!res.ok) return;
-    const reviews = await res.json();
-    track.insertAdjacentHTML('beforeend', reviews.map(r => `
-      <div class="review-card reveal in-view">
-        <div class="stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div>
-        <p>"${r.review_text}"</p>
-        <span class="review-name">— ${r.owner_name}</span>
-      </div>
-    `).join(''));
+    if (res.ok) {
+      const reviews = await res.json();
+      if (Array.isArray(reviews) && reviews.length) {
+        // Match the static testimonial markup exactly so approved reviews get
+        // the same card face/styling as the others.
+        track.insertAdjacentHTML('beforeend', reviews.map(r => `
+      <div class="review-card">
+        <div class="review-card-inner">
+          <div class="review-card-front review-card-single">
+            <div class="stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div>
+            <p>"${escapeAttr(r.review_text)}"</p>
+            <span class="review-name">— ${escapeAttr(r.owner_name)}</span>
+          </div>
+        </div>
+      </div>`).join(''));
+      }
+    }
   } catch {
     // reviews unavailable — leave the static testimonials as-is
   }
+  // Initialise the carousel AFTER approved reviews are in the DOM, so the
+  // stack includes them (it caches its cards at setup time).
+  setupStack(track, document.querySelector('.reviews-prev'), document.querySelector('.reviews-next'), { flip: false });
 }
 
 loadSiteReviews();
@@ -2578,7 +2589,8 @@ function setupStack(stack, prevBtn, nextBtn, { flip = true } = {}) {
   });
 }
 
-setupStack(document.getElementById('reviewsTrack'), document.querySelector('.reviews-prev'), document.querySelector('.reviews-next'), { flip: false });
+// reviewsTrack stack is initialised inside loadSiteReviews() (after approved
+// reviews load) so the carousel includes them.
 // ── Curated client photos ────────────────────────────────────────────────────
 // Pulls the photos Misti has featured in the admin (clients.featured_photos).
 // If any come back we swap the friendly placeholders for the real pet photos;

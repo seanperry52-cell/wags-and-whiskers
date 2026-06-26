@@ -549,7 +549,8 @@ a { color: inherit; text-decoration: none; }
 .review-card-back {
   transform: rotateY(180deg);
   justify-content: center;
-  overflow: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .review-card .stars {
@@ -567,7 +568,8 @@ a { color: inherit; text-decoration: none; }
 }
 
 .review-card-single {
-  overflow: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .review-card-single p {
@@ -575,7 +577,6 @@ a { color: inherit; text-decoration: none; }
   color: var(--brown-light);
   font-size: 0.95rem;
   line-height: 1.55;
-  overflow: hidden;
 }
 
 .review-card-front .review-name,
@@ -656,6 +657,15 @@ a { color: inherit; text-decoration: none; }
 
 @media (max-width: 800px) {
   .booking-top-row { flex-direction: column; }
+  /* Reviews wrap to more lines on narrow screens — give the cards more room
+     and slightly smaller text so the full review shows (and scrolls within
+     the card if it's still extra long, instead of being cut off). */
+  .review-stack { height: 640px; }
+  .review-card { height: 620px; }
+  .review-card-front,
+  .review-card-back { padding: 1.5rem 1.3rem; }
+  .review-card-single p,
+  .review-card-back p { font-size: 0.9rem; line-height: 1.5; }
 }
 
 /* ── AVAILABILITY CALENDAR ── */
