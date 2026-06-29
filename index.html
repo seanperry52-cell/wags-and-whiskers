@@ -61,33 +61,49 @@
               <option value="Day Care">Day Care</option>
             </select>
           </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="rebookStartDate">Start Date</label>
-              <input type="date" id="rebookStartDate" name="startDate" required />
+          <div class="booking-top-row">
+            <div class="calendar-card">
+              <div class="calendar-header">
+                <button type="button" id="rebookCalPrev" class="cal-nav" aria-label="Previous month">‹</button>
+                <h3 id="rebookCalMonthLabel"></h3>
+                <button type="button" id="rebookCalNext" class="cal-nav" aria-label="Next month">›</button>
+              </div>
+              <div id="rebookAvailabilityCalendar" class="calendar-grid"></div>
+              <div class="calendar-legend">
+                <span><i class="dot dot-available"></i> Available</span>
+                <span><i class="dot dot-unavailable"></i> Unavailable</span>
+              </div>
+              <p class="calendar-note">Click an available date to pick it — click a second, later date to book a range. Drop-in visits don't take a full day, so you'll pick a time right here after choosing a date.</p>
+
+              <input type="hidden" id="rebookStartDate" name="startDate" required />
+              <input type="hidden" id="rebookEndDate" name="endDate" />
+
+              <div id="rebookCalendarTimePanel" class="calendar-time-panel" hidden>
+                <p id="rebookCalendarTimePanelSummary" class="calendar-time-panel__summary"></p>
+                <div id="rebookScheduleFields">
+                  <div class="form-row">
+                    <div class="form-group" id="rebookStartTimeGroup">
+                      <label for="rebookStartTime" id="rebookStartTimeLabel">Preferred Time</label>
+                      <select id="rebookStartTime" name="startTime"></select>
+                    </div>
+                    <div class="form-group" id="rebookEndTimeGroup" hidden>
+                      <label for="rebookEndTime">Pick-up Time</label>
+                      <select id="rebookEndTime" name="endTime"></select>
+                    </div>
+                  </div>
+
+                  <div class="form-group full" id="rebookPresetTimesGroup" hidden>
+                    <label>Usual Times <span class="field-hint">(tap to add)</span></label>
+                    <div id="rebookPresetTimes" class="dropin-slots"></div>
+                  </div>
+
+                  <div class="form-group full" id="rebookDropinSlotsGroup" hidden>
+                    <label>Available Times <span class="field-hint">(select one or more)</span></label>
+                    <div id="rebookDropinSlots" class="dropin-slots"></div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="form-group" data-rebook-for="Overnight Stay,Day Care,Drop-In Visit" hidden>
-              <label for="rebookEndDate">End Date <span class="field-hint">(optional &mdash; for multiple days)</span></label>
-              <input type="date" id="rebookEndDate" name="endDate" />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group" data-rebook-for="Overnight Stay,Day Care" hidden>
-              <label for="rebookStartTime">Drop-off Time</label>
-              <select id="rebookStartTime" name="startTime"></select>
-            </div>
-            <div class="form-group" data-rebook-for="Overnight Stay,Day Care" hidden>
-              <label for="rebookEndTime">Pick-up Time</label>
-              <select id="rebookEndTime" name="endTime"></select>
-            </div>
-          </div>
-          <div class="form-group full" id="rebookPresetTimesGroup" hidden>
-            <label>Usual Times <span class="field-hint">(tap to add)</span></label>
-            <div id="rebookPresetTimes" class="dropin-slots"></div>
-          </div>
-          <div class="form-group full" id="rebookDropinSlotsGroup" data-rebook-for="Drop-In Visit" hidden>
-            <label>Available Times <span class="field-hint">(select one or more)</span></label>
-            <div id="rebookDropinSlots" class="dropin-slots"></div>
           </div>
           <div class="form-group full">
             <label for="rebookNotes">Anything we should know for this visit?</label>
