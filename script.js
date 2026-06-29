@@ -86,6 +86,9 @@ let selectedCalendarEndDate = null;
 // middle day can be removed without wiping the rest. Overnight/Day Care still
 // use the start/end range above.
 let dropInDates = new Set();
+// When 2+ drop-in days are picked: same time(s) for every day, or per-day times.
+let dropInSameTimes = true;
+let dropInPerDay = {}; // date -> [times] when picking different times per day
 function diffDays(a, b) {
   return Math.round((new Date(a + 'T00:00:00') - new Date(b + 'T00:00:00')) / 86400000);
 }
@@ -151,7 +154,7 @@ function selectCalendarDate(dateStr) {
     selectedCalendarDate = null;
     selectedCalendarEndDate = null;
     renderCalendar();
-    renderTimeSlots();
+    renderDropInTimeArea();
     updateCalendarTimePanel();
     updatePriceEstimate();
     return;
@@ -419,6 +422,83 @@ populateTimeOptions(endTimeInput);
 // slot picker allows selecting more than one time slot.
 let selectedSlots = new Set();
 
+// Drop-in time area: a "same times for every day?" toggle (when 2+ days), then
+// either one shared time grid or one grid per day for different times.
+function renderDropInTimeArea() {
+  const days = [...dropInDates].sort();
+  if (!days.length) {
+    dropinSlots.innerHTML = '<p class="slots-loading">Tap one or more days on the calendar above to pick times.</p>';
+    return;
+  }
+  dropinSlots.innerHTML = '';
+  if (days.length >= 2) {
+    const tog = document.createElement('div');
+    tog.style.cssText = 'margin:0.3rem 0 0.7rem;padding:0.6rem 0.75rem;background:var(--cream-soft,#f3ecdd);border-radius:12px;';
+    const q = document.createElement('p');
+    q.style.cssText = 'margin:0 0 0.45rem;font-weight:700;';
+    q.textContent = 'Use the same time(s) for every day?';
+    const opts = document.createElement('div');
+    opts.style.cssText = 'display:flex;flex-wrap:wrap;gap:0.5rem;';
+    [['Yes — same times', true], ['No — different times per day', false]].forEach(([label, val]) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'slot-btn ' + (dropInSameTimes === val ? 'slot-selected' : 'slot-available');
+      btn.style.flex = '1 1 auto';
+      btn.textContent = label;
+      btn.addEventListener('click', () => { dropInSameTimes = val; renderDropInTimeArea(); updatePriceEstimate(); });
+      opts.appendChild(btn);
+    });
+    tog.appendChild(q); tog.appendChild(opts);
+    dropinSlots.appendChild(tog);
+  }
+  if (days.length < 2 || dropInSameTimes) {
+    const head = document.createElement('div');
+    head.style.cssText = 'font-weight:700;margin-bottom:0.2rem;';
+    head.textContent = days.length > 1 ? 'Time(s) for all selected days' : formatCalendarDate(days[0]);
+    const grid = document.createElement('div');
+    grid.className = 'dropin-slots';
+    grid.innerHTML = '<p class="slots-loading">Loading times…</p>';
+    dropinSlots.appendChild(head); dropinSlots.appendChild(grid);
+    loadDropInGrid(days[0], grid, selectedSlots, true);
+  } else {
+    days.forEach((date) => {
+      if (!dropInPerDay[date]) dropInPerDay[date] = [];
+      const head = document.createElement('div');
+      head.style.cssText = 'font-weight:700;margin:0.6rem 0 0.2rem;';
+      head.textContent = formatCalendarDate(date);
+      const grid = document.createElement('div');
+      grid.className = 'dropin-slots';
+      grid.innerHTML = '<p class="slots-loading">Loading times…</p>';
+      dropinSlots.appendChild(head); dropinSlots.appendChild(grid);
+      loadDropInGrid(date, grid, dropInPerDay[date], false);
+    });
+  }
+}
+async function loadDropInGrid(date, grid, store, isSet) {
+  try {
+    const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${date}`);
+    if (!res.ok) throw new Error('bad');
+    const data = await res.json();
+    grid.innerHTML = '';
+    (data.slots || []).forEach((s) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `slot-btn ${s.available ? 'slot-available' : 'slot-booked'}`;
+      btn.textContent = formatTime(s.time);
+      btn.disabled = !s.available;
+      const has = isSet ? store.has(s.time) : store.includes(s.time);
+      if (has) btn.classList.add('slot-selected');
+      btn.addEventListener('click', () => {
+        if (isSet) { store.has(s.time) ? store.delete(s.time) : store.add(s.time); }
+        else { const i = store.indexOf(s.time); i >= 0 ? store.splice(i, 1) : store.push(s.time); }
+        btn.classList.toggle('slot-selected');
+        updatePriceEstimate();
+      });
+      grid.appendChild(btn);
+    });
+  } catch { grid.innerHTML = '<p class="slots-error">Could not load times — please try again.</p>'; }
+}
+
 async function renderTimeSlots() {
   const date = startDateInput.value;
 
@@ -477,9 +557,11 @@ function updateTimeFields() {
     dropinSlotsGroup.hidden = false;
     selectedSlots.clear();
     dropInDates.clear();
+    dropInSameTimes = true;
+    dropInPerDay = {};
     startDateInput.value = '';
     endDateInput.value = '';
-    renderTimeSlots();
+    renderDropInTimeArea();
   } else {
     startTimeGroup.hidden = false;
     startTimeLabel.textContent = 'Preferred Time';
@@ -514,8 +596,7 @@ startDateInput.addEventListener('change', () => {
   }
   renderCalendar();
   if (DROP_IN_SERVICES.has(serviceTypeSelect.value)) {
-    selectedSlots.clear();
-    renderTimeSlots();
+    renderDropInTimeArea();
   }
   updatePriceEstimate();
   updateCalendarTimePanel();
@@ -743,10 +824,17 @@ function updatePriceEstimate() {
       return;
     }
     const isFar = parseFloat(distanceMilesInput.value) >= 5;
-    const visitCount = Math.max(selectedSlots.size, 1);
-    // Drop-in days are an explicit set; fall back to a range for safety.
-    const daySpan = dropInDates.size || ((endDate && endDate !== startDate) ? nights + 1 : 1);
-    const totalVisits = visitCount * daySpan;
+    const dDays = [...dropInDates];
+    // Per-day mode: sum each day's own times. Same-times mode: times × days.
+    const perDayMode = dDays.length >= 2 && !dropInSameTimes;
+    let totalVisits;
+    if (perDayMode) {
+      totalVisits = dDays.reduce((n, dt) => n + ((dropInPerDay[dt] || []).length), 0);
+    } else {
+      const daySpan = dDays.length || ((endDate && endDate !== startDate) ? nights + 1 : 1);
+      totalVisits = Math.max(selectedSlots.size, 1) * daySpan;
+    }
+    if (totalVisits === 0) { priceEstimateEl.hidden = true; return; }
     const extended = totalVisits >= 14;
     const rates = extended ? DROP_IN_EXTENDED_RATES : DROP_IN_RATES;
     const rate = (isFar ? rates.far : rates.near) + (isPuppy ? PUPPY_ADDON : 0);
@@ -1210,20 +1298,34 @@ bookingForm.addEventListener('submit', async (e) => {
   }
 
   let requestDates = [d.startDate];
+  let perDayTimes = null; // drop-in: date -> comma times (per-day or shared)
   if (DROP_IN_SERVICES.has(d.serviceType)) {
     if (!ongoing) {
       if (dropInDates.size === 0) {
         showBookingStatus('Please choose at least one day on the calendar.', 'error');
         return;
       }
-      if (selectedSlots.size === 0) {
-        showBookingStatus('Please choose at least one time slot for your visit.', 'error');
-        return;
-      }
-      d.startTime = [...selectedSlots].sort().join(',');
       // Drop-in days are an explicit set (can be non-contiguous) -- one booking
-      // row per selected day, with the same time(s) each day.
+      // row per selected day. Same times for all, or per-day if chosen.
       requestDates = [...dropInDates].sort();
+      const sameForAll = requestDates.length < 2 || dropInSameTimes;
+      if (sameForAll) {
+        if (selectedSlots.size === 0) {
+          showBookingStatus('Please choose at least one time slot for your visit.', 'error');
+          return;
+        }
+        const t = [...selectedSlots].sort().join(',');
+        perDayTimes = {};
+        requestDates.forEach((dt) => { perDayTimes[dt] = t; });
+      } else {
+        if (requestDates.some((dt) => !(dropInPerDay[dt] && dropInPerDay[dt].length))) {
+          showBookingStatus('Please pick at least one time for each day.', 'error');
+          return;
+        }
+        perDayTimes = {};
+        requestDates.forEach((dt) => { perDayTimes[dt] = [...dropInPerDay[dt]].sort().join(','); });
+      }
+      d.startTime = [...new Set(requestDates.flatMap((dt) => perDayTimes[dt].split(',')))].sort().join(',');
       d.startDate = requestDates[0];
     } else {
       // Ongoing client -- no fixed schedule yet.
@@ -1251,6 +1353,7 @@ bookingForm.addEventListener('submit', async (e) => {
       // date -- suppress the server's automatic per-booking email here.
       if (requestDates.length > 1) body.suppressEmail = true;
       if (groupId) body.groupId = groupId;
+      if (perDayTimes) body.startTime = perDayTimes[requestDate];
       const res = await fetch(`${BOOKING_API}/api/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1299,8 +1402,10 @@ bookingForm.addEventListener('submit', async (e) => {
     if (DROP_IN_SERVICES.has(d.serviceType)) {
       selectedSlots.clear();
       dropInDates.clear();
+      dropInSameTimes = true;
+      dropInPerDay = {};
       startDateInput.value = '';
-      renderTimeSlots();
+      renderDropInTimeArea();
       updateCalendarTimePanel();
     }
   } catch (err) {
