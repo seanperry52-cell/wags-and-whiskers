@@ -82,6 +82,13 @@ calMonth.setDate(1);
 // switching service type) don't lose the selection.
 let selectedCalendarDate = null;
 let selectedCalendarEndDate = null;
+// Drop-in visits are an independent SET of days (not a contiguous range), so a
+// middle day can be removed without wiping the rest. Overnight/Day Care still
+// use the start/end range above.
+let dropInDates = new Set();
+function diffDays(a, b) {
+  return Math.round((new Date(a + 'T00:00:00') - new Date(b + 'T00:00:00')) / 86400000);
+}
 
 const calendarTimePanel = document.getElementById('calendarTimePanel');
 const calendarTimePanelSummary = document.getElementById('calendarTimePanelSummary');
@@ -96,6 +103,14 @@ function formatCalendarDate(dateStr) {
 // a date has actually been picked.
 function updateCalendarTimePanel() {
   const start = startDateInput.value;
+  // Drop-in: the panel is open while any individual day is selected.
+  if (DROP_IN_SERVICES.has(serviceTypeSelect.value)) {
+    if (!dropInDates.size) { calendarTimePanel.hidden = true; return; }
+    calendarTimePanel.hidden = false;
+    const n = dropInDates.size;
+    calendarTimePanelSummary.textContent = `${n} day${n === 1 ? '' : 's'} selected`;
+    return;
+  }
   if (!start) {
     calendarTimePanel.hidden = true;
     return;
@@ -114,6 +129,33 @@ function updateCalendarTimePanel() {
 // date range; clicking the start date again clears a previously-set end
 // date back to a single day; any other click starts a fresh selection.
 function selectCalendarDate(dateStr) {
+  // Drop-ins: toggle individual days. Clicking a selected day removes just that
+  // day (others stay); clicking an unselected day adds it, and if days are
+  // already selected, fills the span from the nearest selected day to this one
+  // (so "click 22 then 30" selects 22–30, and you can then click 25 to drop it).
+  if (DROP_IN_SERVICES.has(serviceTypeSelect.value)) {
+    if (dropInDates.has(dateStr)) {
+      dropInDates.delete(dateStr);
+    } else if (dropInDates.size === 0) {
+      dropInDates.add(dateStr);
+    } else {
+      const arr = [...dropInDates].sort();
+      const nearest = arr.reduce((a, b) => Math.abs(diffDays(b, dateStr)) < Math.abs(diffDays(a, dateStr)) ? b : a);
+      const lo = dateStr < nearest ? dateStr : nearest;
+      const hi = dateStr < nearest ? nearest : dateStr;
+      dateRangeArray(lo, hi).forEach((d) => dropInDates.add(d));
+    }
+    const sorted = [...dropInDates].sort();
+    startDateInput.value = sorted[0] || '';
+    endDateInput.value = '';
+    selectedCalendarDate = null;
+    selectedCalendarEndDate = null;
+    renderCalendar();
+    renderTimeSlots();
+    updateCalendarTimePanel();
+    updatePriceEstimate();
+    return;
+  }
   if (selectedCalendarEndDate || !selectedCalendarDate) {
     // Nothing picked yet, or a full range is already set -- this click
     // starts a fresh selection with the clicked day as the (lone) start.
@@ -198,6 +240,8 @@ async function renderCalendar() {
         : dateStr === selectedCalendarDate
     );
     if (inSelectedRange) cell.classList.add('cal-selected');
+    // Drop-in: highlight every individually-selected day.
+    if (isDropIn && !unavailableForService && dropInDates.has(dateStr)) cell.classList.add('cal-selected');
     cell.textContent = day;
     if (!unavailableForService) {
       cell.addEventListener('click', () => selectCalendarDate(dateStr));
@@ -432,6 +476,9 @@ function updateTimeFields() {
     endTimeInput.value = '';
     dropinSlotsGroup.hidden = false;
     selectedSlots.clear();
+    dropInDates.clear();
+    startDateInput.value = '';
+    endDateInput.value = '';
     renderTimeSlots();
   } else {
     startTimeGroup.hidden = false;
@@ -697,7 +744,8 @@ function updatePriceEstimate() {
     }
     const isFar = parseFloat(distanceMilesInput.value) >= 5;
     const visitCount = Math.max(selectedSlots.size, 1);
-    const daySpan = (endDate && endDate !== startDate) ? nights + 1 : 1;
+    // Drop-in days are an explicit set; fall back to a range for safety.
+    const daySpan = dropInDates.size || ((endDate && endDate !== startDate) ? nights + 1 : 1);
     const totalVisits = visitCount * daySpan;
     const extended = totalVisits >= 14;
     const rates = extended ? DROP_IN_EXTENDED_RATES : DROP_IN_RATES;
@@ -1163,23 +1211,22 @@ bookingForm.addEventListener('submit', async (e) => {
 
   let requestDates = [d.startDate];
   if (DROP_IN_SERVICES.has(d.serviceType)) {
-    if (!ongoing && selectedSlots.size === 0) {
-      showBookingStatus('Please choose at least one time slot for your visit.', 'error');
-      return;
-    }
-    if (selectedSlots.size > 0) {
-      d.startTime = [...selectedSlots].sort().join(',');
-      // A drop-in's End Date means "request these same times every day in
-      // this range," not a single multi-night stay -- each day becomes its
-      // own independent booking/approval, so the per-booking endDate itself
-      // is cleared below. This still applies for an Ongoing client who picked
-      // a concrete first-visit range -- it gets blocked like a real visit;
-      // only later/future visits are arranged ad hoc.
-      if (d.endDate && d.endDate !== d.startDate) {
-        requestDates = dateRangeArray(d.startDate, d.endDate);
+    if (!ongoing) {
+      if (dropInDates.size === 0) {
+        showBookingStatus('Please choose at least one day on the calendar.', 'error');
+        return;
       }
+      if (selectedSlots.size === 0) {
+        showBookingStatus('Please choose at least one time slot for your visit.', 'error');
+        return;
+      }
+      d.startTime = [...selectedSlots].sort().join(',');
+      // Drop-in days are an explicit set (can be non-contiguous) -- one booking
+      // row per selected day, with the same time(s) each day.
+      requestDates = [...dropInDates].sort();
+      d.startDate = requestDates[0];
     } else {
-      // Ongoing client who didn't pick any times yet -- no fixed schedule.
+      // Ongoing client -- no fixed schedule yet.
       d.startTime = '';
     }
     d.endDate = '';
@@ -1251,7 +1298,10 @@ bookingForm.addEventListener('submit', async (e) => {
     renderCalendar();
     if (DROP_IN_SERVICES.has(d.serviceType)) {
       selectedSlots.clear();
+      dropInDates.clear();
+      startDateInput.value = '';
       renderTimeSlots();
+      updateCalendarTimePanel();
     }
   } catch (err) {
     // The booking system itself never confirmed the request (network error,
