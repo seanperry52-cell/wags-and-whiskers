@@ -516,24 +516,27 @@ async function renderDropInTimeArea() {
       }
     }
 
-    // Every selected day always shows its OWN availability grid: read-only when
-    // it inherits the first day's times, editable when it has its own (or was
-    // forced onto its own by a conflict above).
-    const grid = document.createElement('div');
-    grid.className = 'dropin-slots';
-    grid.innerHTML = '<p class="slots-loading">Loading times…</p>';
-    dropinSlots.appendChild(grid);
-    if (i === 0) loadDropInGrid(date, grid, selectedSlots, true, false, slots, true);
-    else if (inheriting) loadDropInGrid(date, grid, selectedSlots, true, true, slots);
-    else { if (!dropInPerDay[date]) dropInPerDay[date] = []; loadDropInGrid(date, grid, dropInPerDay[date], false, false, slots); }
+    // A grid is only shown where the client actually picks times: the first
+    // day, a day they've unchecked "same times" on, or a day a conflict forced
+    // onto its own times (which set inheriting = false above). A day quietly
+    // using the first day's times needs no grid of its own.
+    if (i === 0 || !inheriting) {
+      const grid = document.createElement('div');
+      grid.className = 'dropin-slots';
+      grid.innerHTML = '<p class="slots-loading">Loading times…</p>';
+      dropinSlots.appendChild(grid);
+      if (i === 0) {
+        loadDropInGrid(date, grid, selectedSlots, true, slots, true);
+      } else {
+        if (!dropInPerDay[date]) dropInPerDay[date] = [];
+        loadDropInGrid(date, grid, dropInPerDay[date], false, slots);
+      }
+    }
   });
 }
-// readOnly: an inheriting day (i>0 with "same times" on) shows its OWN
-// availability but isn't editable here -- times are changed on the first day,
-// or by unchecking "same times". `prefetched` is that day's already-fetched
-// slots array (renderDropInTimeArea loads them once up front); pass undefined to
-// have the grid fetch them itself.
-async function loadDropInGrid(date, grid, store, isSet, readOnly = false, prefetched = undefined, isFirstDay = false) {
+// `prefetched` is that day's already-fetched slots array (renderDropInTimeArea
+// loads them once up front); pass undefined to have the grid fetch them itself.
+async function loadDropInGrid(date, grid, store, isSet, prefetched = undefined, isFirstDay = false) {
   try {
     let slots = prefetched;
     if (slots === undefined) {
@@ -550,23 +553,19 @@ async function loadDropInGrid(date, grid, store, isSet, readOnly = false, prefet
       btn.textContent = formatTime(s.time);
       const has = isSet ? store.has(s.time) : store.includes(s.time);
       if (has) btn.classList.add('slot-selected');
-      if (readOnly) {
-        btn.disabled = true;
-      } else {
-        btn.disabled = !s.available;
-        btn.addEventListener('click', () => {
-          if (isSet) { store.has(s.time) ? store.delete(s.time) : store.add(s.time); }
-          else { const i = store.indexOf(s.time); i >= 0 ? store.splice(i, 1) : store.push(s.time); }
-          btn.classList.toggle('slot-selected');
-          updatePriceEstimate();
-          // Changing the first day's times changes what the other days inherit,
-          // so re-render the whole area: any day that would now inherit a time
-          // booked on it flips to the red ✕ + its own grid right away, without
-          // the client having to click that day first. (Availability is cached,
-          // so this re-render is instant.)
-          if (isFirstDay && dropInDates.size > 1) renderDropInTimeArea();
-        });
-      }
+      btn.disabled = !s.available;
+      btn.addEventListener('click', () => {
+        if (isSet) { store.has(s.time) ? store.delete(s.time) : store.add(s.time); }
+        else { const i = store.indexOf(s.time); i >= 0 ? store.splice(i, 1) : store.push(s.time); }
+        btn.classList.toggle('slot-selected');
+        updatePriceEstimate();
+        // Changing the first day's times changes what the other days inherit,
+        // so re-render the whole area: any day that would now inherit a time
+        // booked on it flips to the red ✕ + its own grid right away, without
+        // the client having to click that day first. (Availability is cached,
+        // so this re-render is instant.)
+        if (isFirstDay && dropInDates.size > 1) renderDropInTimeArea();
+      });
       grid.appendChild(btn);
     });
   } catch { grid.innerHTML = '<p class="slots-error">Could not load times — please try again.</p>'; }
