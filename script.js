@@ -90,6 +90,10 @@ let dropInDates = new Set();
 let dropInSameTimes = true;
 let dropInPerDay = {}; // date -> [times] for a day with its own (not-inherited) times
 let dropInInherit = {}; // date -> bool: use the first day's times (default true)
+// date -> slots array (or null): cached per-day availability so re-rendering the
+// time area (e.g. after picking a first-day time) is instant and doesn't re-flash
+// "Loading…" on every click. Cleared when a booking is made / service changes.
+let dropInSlotCache = {};
 // Effective times for a day: first day (or an "inherit" day) uses the shared
 // first-day set; a day toggled off uses its own.
 function dropInEffTimes(date, i) {
@@ -430,12 +434,16 @@ populateTimeOptions(endTimeInput);
 let selectedSlots = new Set();
 
 // Fetches one day's 30-minute slot availability; returns the slots array, or
-// null if the booking server is unreachable / errors.
+// null if the booking server is unreachable / errors. Cached for the session so
+// re-renders are instant -- a failed fetch (null) isn't cached, so it retries.
 async function fetchDropInSlots(date) {
+  if (dropInSlotCache[date]) return dropInSlotCache[date];
   try {
     const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${date}`);
     if (!res.ok) return null;
-    return (await res.json()).slots || [];
+    const slots = (await res.json()).slots || [];
+    dropInSlotCache[date] = slots;
+    return slots;
   } catch { return null; }
 }
 
@@ -515,7 +523,7 @@ async function renderDropInTimeArea() {
     grid.className = 'dropin-slots';
     grid.innerHTML = '<p class="slots-loading">Loading times…</p>';
     dropinSlots.appendChild(grid);
-    if (i === 0) loadDropInGrid(date, grid, selectedSlots, true, false, slots);
+    if (i === 0) loadDropInGrid(date, grid, selectedSlots, true, false, slots, true);
     else if (inheriting) loadDropInGrid(date, grid, selectedSlots, true, true, slots);
     else { if (!dropInPerDay[date]) dropInPerDay[date] = []; loadDropInGrid(date, grid, dropInPerDay[date], false, false, slots); }
   });
@@ -525,7 +533,7 @@ async function renderDropInTimeArea() {
 // or by unchecking "same times". `prefetched` is that day's already-fetched
 // slots array (renderDropInTimeArea loads them once up front); pass undefined to
 // have the grid fetch them itself.
-async function loadDropInGrid(date, grid, store, isSet, readOnly = false, prefetched = undefined) {
+async function loadDropInGrid(date, grid, store, isSet, readOnly = false, prefetched = undefined, isFirstDay = false) {
   try {
     let slots = prefetched;
     if (slots === undefined) {
@@ -551,6 +559,12 @@ async function loadDropInGrid(date, grid, store, isSet, readOnly = false, prefet
           else { const i = store.indexOf(s.time); i >= 0 ? store.splice(i, 1) : store.push(s.time); }
           btn.classList.toggle('slot-selected');
           updatePriceEstimate();
+          // Changing the first day's times changes what the other days inherit,
+          // so re-render the whole area: any day that would now inherit a time
+          // booked on it flips to the red ✕ + its own grid right away, without
+          // the client having to click that day first. (Availability is cached,
+          // so this re-render is instant.)
+          if (isFirstDay && dropInDates.size > 1) renderDropInTimeArea();
         });
       }
       grid.appendChild(btn);
@@ -619,6 +633,7 @@ function updateTimeFields() {
     dropInSameTimes = true;
     dropInPerDay = {};
     dropInInherit = {};
+    dropInSlotCache = {};
     startDateInput.value = '';
     endDateInput.value = '';
     renderDropInTimeArea();
@@ -1453,6 +1468,7 @@ bookingForm.addEventListener('submit', async (e) => {
       dropInSameTimes = true;
       dropInPerDay = {};
       dropInInherit = {};
+      dropInSlotCache = {};
       startDateInput.value = '';
       renderDropInTimeArea();
       updateCalendarTimePanel();
