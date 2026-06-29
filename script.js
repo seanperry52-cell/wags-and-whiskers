@@ -452,6 +452,11 @@ serviceTypeSelect.addEventListener('change', () => {
 startDateInput.addEventListener('change', () => {
   startTimeInput.value = '';
   selectedCalendarDate = startDateInput.value || null;
+  // Keep the end-selection state in sync with the field. Without this, starting
+  // a fresh selection (which clears endDate) left a STALE selectedCalendarEndDate
+  // behind, so every subsequent click hit the "fresh start" branch and a date
+  // could never be deselected or changed without refreshing the page.
+  selectedCalendarEndDate = endDateInput.value || null;
   // End date can't be before the (possibly new) start date -- this also
   // nudges native date pickers to open showing the same month as the
   // start date instead of whatever month they last happened to be on.
