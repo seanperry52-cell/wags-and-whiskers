@@ -429,9 +429,19 @@ populateTimeOptions(endTimeInput);
 // slot picker allows selecting more than one time slot.
 let selectedSlots = new Set();
 
+// Fetches one day's 30-minute slot availability; returns the slots array, or
+// null if the booking server is unreachable / errors.
+async function fetchDropInSlots(date) {
+  try {
+    const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${date}`);
+    if (!res.ok) return null;
+    return (await res.json()).slots || [];
+  } catch { return null; }
+}
+
 // Drop-in time area: a "same times for every day?" toggle (when 2+ days), then
 // either one shared time grid or one grid per day for different times.
-function renderDropInTimeArea() {
+async function renderDropInTimeArea() {
   // #dropinSlots itself is a grid; lay our toggle/headings/per-day grids out as
   // normal blocks so each day's time buttons form their own multi-column grid.
   dropinSlots.style.display = 'block';
@@ -440,58 +450,109 @@ function renderDropInTimeArea() {
     dropinSlots.innerHTML = '<p class="slots-loading">Tap one or more days on the calendar above to pick times.</p>';
     return;
   }
-  dropinSlots.innerHTML = '';
+  dropinSlots.innerHTML = '<p class="slots-loading">Loading times…</p>';
   const firstLabel = formatCalendarDate(days[0]);
+
+  // Fetch every selected day's availability up front: the "same times as the
+  // first day" toggle needs to know, before the client touches it, whether the
+  // first day's chosen times are even open that day. A day where one isn't
+  // doesn't get a same-times option at all -- it gets a red ✕ plus its own
+  // editable grid, so the client fixes that day's times right there.
+  const slotsByDay = {};
+  await Promise.all(days.map(async (date) => { slotsByDay[date] = await fetchDropInSlots(date); }));
+
+  dropinSlots.innerHTML = '';
   days.forEach((date, i) => {
     const head = document.createElement('div');
     head.style.cssText = 'font-weight:700;margin:0.7rem 0 0.2rem;';
     head.textContent = formatCalendarDate(date);
     dropinSlots.appendChild(head);
-    let showGrid = true;
+
+    const slots = slotsByDay[date]; // array, or null if the fetch failed
+    const availableSet = slots ? new Set(slots.filter((s) => s.available).map((s) => s.time)) : null;
+
+    let inheriting = false;
     if (i > 0) {
       if (dropInInherit[date] === undefined) dropInInherit[date] = true;
-      const row = document.createElement('label');
-      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:0.1rem 0 0.4rem;cursor:pointer;background:var(--cream-soft,#f3ecdd);padding:0.45rem 0.7rem;border-radius:10px;';
-      const span = document.createElement('span');
-      span.textContent = `Use the same times as ${firstLabel}`;
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = dropInInherit[date] !== false;
-      cb.addEventListener('change', () => { dropInInherit[date] = cb.checked; renderDropInTimeArea(); updatePriceEstimate(); });
-      row.appendChild(span); row.appendChild(cb);
-      dropinSlots.appendChild(row);
-      showGrid = dropInInherit[date] === false;
+      // Which of the first day's chosen times are booked on THIS day?
+      const conflictTimes = availableSet ? [...selectedSlots].filter((t) => !availableSet.has(t)) : [];
+      if (conflictTimes.length) {
+        // Can't honor "same times" here. Force this day onto its own times,
+        // pre-filled with whatever first-day times ARE open that day, and show
+        // a red ✕ explaining why instead of a checkbox they can't satisfy.
+        dropInInherit[date] = false;
+        if (dropInPerDay[date] === undefined) {
+          dropInPerDay[date] = [...selectedSlots].filter((t) => availableSet.has(t));
+        }
+        const row = document.createElement('div');
+        row.className = 'inherit-row inherit-conflict';
+        row.innerHTML =
+          `<span class="inherit-x">✕</span>` +
+          `<span>Can’t use the same times as ${firstLabel} — ` +
+          `${conflictTimes.map(formatTime).join(', ')} ` +
+          `${conflictTimes.length === 1 ? 'is' : 'are'} already booked this day. Pick open times below.</span>`;
+        dropinSlots.appendChild(row);
+      } else {
+        inheriting = dropInInherit[date] !== false;
+        const row = document.createElement('label');
+        row.className = 'inherit-row';
+        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:0.1rem 0 0.4rem;cursor:pointer;background:var(--cream-soft,#f3ecdd);padding:0.45rem 0.7rem;border-radius:10px;';
+        const span = document.createElement('span');
+        span.textContent = `Use the same times as ${firstLabel}`;
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = inheriting;
+        cb.addEventListener('change', () => { dropInInherit[date] = cb.checked; renderDropInTimeArea(); updatePriceEstimate(); });
+        row.appendChild(span); row.appendChild(cb);
+        dropinSlots.appendChild(row);
+      }
     }
-    if (showGrid) {
-      const grid = document.createElement('div');
-      grid.className = 'dropin-slots';
-      grid.innerHTML = '<p class="slots-loading">Loading times…</p>';
-      dropinSlots.appendChild(grid);
-      if (i === 0) loadDropInGrid(date, grid, selectedSlots, true);
-      else { if (!dropInPerDay[date]) dropInPerDay[date] = []; loadDropInGrid(date, grid, dropInPerDay[date], false); }
-    }
+
+    // Every selected day always shows its OWN availability grid: read-only when
+    // it inherits the first day's times, editable when it has its own (or was
+    // forced onto its own by a conflict above).
+    const grid = document.createElement('div');
+    grid.className = 'dropin-slots';
+    grid.innerHTML = '<p class="slots-loading">Loading times…</p>';
+    dropinSlots.appendChild(grid);
+    if (i === 0) loadDropInGrid(date, grid, selectedSlots, true, false, slots);
+    else if (inheriting) loadDropInGrid(date, grid, selectedSlots, true, true, slots);
+    else { if (!dropInPerDay[date]) dropInPerDay[date] = []; loadDropInGrid(date, grid, dropInPerDay[date], false, false, slots); }
   });
 }
-async function loadDropInGrid(date, grid, store, isSet) {
+// readOnly: an inheriting day (i>0 with "same times" on) shows its OWN
+// availability but isn't editable here -- times are changed on the first day,
+// or by unchecking "same times". `prefetched` is that day's already-fetched
+// slots array (renderDropInTimeArea loads them once up front); pass undefined to
+// have the grid fetch them itself.
+async function loadDropInGrid(date, grid, store, isSet, readOnly = false, prefetched = undefined) {
   try {
-    const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${date}`);
-    if (!res.ok) throw new Error('bad');
-    const data = await res.json();
+    let slots = prefetched;
+    if (slots === undefined) {
+      const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${date}`);
+      if (!res.ok) throw new Error('bad');
+      slots = (await res.json()).slots || [];
+    }
+    if (slots == null) throw new Error('bad'); // prefetch failed
     grid.innerHTML = '';
-    (data.slots || []).forEach((s) => {
+    slots.forEach((s) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = `slot-btn ${s.available ? 'slot-available' : 'slot-booked'}`;
       btn.textContent = formatTime(s.time);
-      btn.disabled = !s.available;
       const has = isSet ? store.has(s.time) : store.includes(s.time);
       if (has) btn.classList.add('slot-selected');
-      btn.addEventListener('click', () => {
-        if (isSet) { store.has(s.time) ? store.delete(s.time) : store.add(s.time); }
-        else { const i = store.indexOf(s.time); i >= 0 ? store.splice(i, 1) : store.push(s.time); }
-        btn.classList.toggle('slot-selected');
-        updatePriceEstimate();
-      });
+      if (readOnly) {
+        btn.disabled = true;
+      } else {
+        btn.disabled = !s.available;
+        btn.addEventListener('click', () => {
+          if (isSet) { store.has(s.time) ? store.delete(s.time) : store.add(s.time); }
+          else { const i = store.indexOf(s.time); i >= 0 ? store.splice(i, 1) : store.push(s.time); }
+          btn.classList.toggle('slot-selected');
+          updatePriceEstimate();
+        });
+      }
       grid.appendChild(btn);
     });
   } catch { grid.innerHTML = '<p class="slots-error">Could not load times — please try again.</p>'; }
@@ -1307,7 +1368,7 @@ bookingForm.addEventListener('submit', async (e) => {
         return;
       }
       if (requestDates.some((dt, i) => dropInEffTimes(dt, i).length === 0)) {
-        showBookingStatus('Please pick at least one time for each day (or keep "same times" on).', 'error');
+        showBookingStatus('Please pick at least one open time for each day.', 'error');
         return;
       }
       perDayTimes = {};
