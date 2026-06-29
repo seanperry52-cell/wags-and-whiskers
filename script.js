@@ -94,6 +94,11 @@ let dropInInherit = {}; // date -> bool: use the first day's times (default true
 // time area (e.g. after picking a first-day time) is instant and doesn't re-flash
 // "Loading…" on every click. Cleared when a booking is made / service changes.
 let dropInSlotCache = {};
+// Conflict days (a first-day time is booked that day) are forced onto their own
+// grid but keep mirroring the first day's still-open times -- until the client
+// edits that day's grid themselves, at which point the date is "touched" here
+// and stops auto-syncing so their manual choice isn't overwritten.
+let dropInPerDayTouched = new Set();
 // Effective times for a day: first day (or an "inherit" day) uses the shared
 // first-day set; a day toggled off uses its own.
 function dropInEffTimes(date, i) {
@@ -489,7 +494,11 @@ async function renderDropInTimeArea() {
         // pre-filled with whatever first-day times ARE open that day, and show
         // a red ✕ explaining why instead of a checkbox they can't satisfy.
         dropInInherit[date] = false;
-        if (dropInPerDay[date] === undefined) {
+        // Carry over the first day's times that ARE open this day, and keep them
+        // in sync as the first day's selection changes -- until the client edits
+        // this day's grid themselves (dropInPerDayTouched), after which it's
+        // their own day and stops auto-syncing.
+        if (!dropInPerDayTouched.has(date)) {
           dropInPerDay[date] = [...selectedSlots].filter((t) => availableSet.has(t));
         }
         const row = document.createElement('div');
@@ -556,7 +565,7 @@ async function loadDropInGrid(date, grid, store, isSet, prefetched = undefined, 
       btn.disabled = !s.available;
       btn.addEventListener('click', () => {
         if (isSet) { store.has(s.time) ? store.delete(s.time) : store.add(s.time); }
-        else { const i = store.indexOf(s.time); i >= 0 ? store.splice(i, 1) : store.push(s.time); }
+        else { const i = store.indexOf(s.time); i >= 0 ? store.splice(i, 1) : store.push(s.time); dropInPerDayTouched.add(date); }
         btn.classList.toggle('slot-selected');
         updatePriceEstimate();
         // Changing the first day's times changes what the other days inherit,
@@ -633,6 +642,7 @@ function updateTimeFields() {
     dropInPerDay = {};
     dropInInherit = {};
     dropInSlotCache = {};
+    dropInPerDayTouched = new Set();
     startDateInput.value = '';
     endDateInput.value = '';
     renderDropInTimeArea();
@@ -1468,6 +1478,7 @@ bookingForm.addEventListener('submit', async (e) => {
       dropInPerDay = {};
       dropInInherit = {};
       dropInSlotCache = {};
+      dropInPerDayTouched = new Set();
       startDateInput.value = '';
       renderDropInTimeArea();
       updateCalendarTimePanel();
