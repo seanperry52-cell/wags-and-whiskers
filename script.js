@@ -70,64 +70,84 @@ document.querySelectorAll('.tilt-inner').forEach(card => {
 // ── Availability calendar ───────────────────────────────────────────────────
 const BOOKING_API = 'https://desktop-rac3kc3.tail27701f.ts.net/wags-booking';
 
+// Auto-update: the page is served no-store, but an already-open tab can still
+// be running an old script. Compare our version against the published one and
+// reload if it's stale (once per version, to avoid loops). This is why earlier
+// booking-calendar fixes "didn't work" — the tab was still on old code.
+const SITE_VERSION = '20260627perday11';
+(function watchSiteVersion() {
+  async function check() {
+    try {
+      const r = await fetch('version.txt?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) return;
+      const v = (await r.text()).trim();
+      const key = 'wags_reloaded_' + v;
+      if (v && v !== SITE_VERSION && !sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, '1');
+        location.reload();
+      }
+    } catch { /* offline / not reachable — ignore */ }
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+  window.addEventListener('focus', check);
+  check();
+})();
+
 function ymd(year, month, day) {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-// Day difference + a friendly "Mon D, YYYY" label, shared by the calendars below.
-function diffDays(a, b) {
-  return Math.round((new Date(a + 'T00:00:00') - new Date(b + 'T00:00:00')) / 86400000);
-}
+const calMonth = new Date();
+calMonth.setDate(1);
+
+// Tracks which day(s) the client has actually picked, so the calendar can
+// highlight the whole chosen range (start..end) and re-renders (e.g.
+// switching service type) don't lose the selection.
+let selectedCalendarDate = null;
+let selectedCalendarEndDate = null;
+// Declared up here because renderCalendar() (below, called at load) reads it.
+let dropInPlan = []; // multi-day drop-in: [{ date, times: [] }]
+let dayCarePlan = []; // Day Care: multiple separate days ["YYYY-MM-DD", ...]
+// When several days are picked: same time(s) for every day, or per-day times.
+let dropInSameTimes = true;
+let dropInSharedTimes = []; // the shared time(s) when dropInSameTimes is true
+
+const calendarTimePanel = document.getElementById('calendarTimePanel');
+const calendarTimePanelSummary = document.getElementById('calendarTimePanelSummary');
+
 function formatCalendarDate(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-// ── Reusable availability calendar + time picker ─────────────────────────────
-// One factory drives BOTH the new-client booking form and the returning-client
-// "Book" tab. cfg supplies that form's elements + hooks; every bit of selection
-// state lives in this closure, so the two calendars never share state.
-function createBookingCalendar(cfg) {
-  const {
-    serviceTypeSelect, startDateInput, endDateInput, startTimeInput, endTimeInput,
-    startTimeGroup, startTimeLabel, endTimeGroup, dropinSlotsGroup, dropinSlots,
-    calendarTimePanel, calendarTimePanelSummary, calEl, monthLabel, prevBtn, nextBtn,
-  } = cfg;
-  const onChange = cfg.onChange || (() => {});
-  const onServiceChange = cfg.onServiceChange || (() => {});
-  // Extra query params for the per-day slot fetch (the rebook calendar passes
-  // &clientId=... so the signed-in client's own visit isn't shown as taken).
-  const slotParams = cfg.slotParams || (() => '');
-
-  const calMonth = new Date();
-  calMonth.setDate(1);
-  let selectedCalendarDate = null;
-  let selectedCalendarEndDate = null;
-  let dropInDates = new Set();
-  let dropInPerDay = {};                // date -> [times] for a day with its own times
-  let dropInInherit = {};               // date -> bool: use the first day's times (default true)
-  let dropInSlotCache = {};             // date -> slots array (or null): cached availability
-  let dropInPerDayTouched = new Set();  // dates the client edited (stop auto-syncing)
-  let selectedSlots = new Set();        // the first day's shared drop-in times
-
-  // Effective times for a day: first day (or an "inherit" day) uses the shared
-  // first-day set; a day toggled off uses its own.
-  function dropInEffTimes(date, i) {
-    if (i === 0 || dropInInherit[date] !== false) return [...selectedSlots];
-    return dropInPerDay[date] || [];
-  }
-
 // Reflects the current start/end selection above the time picker, and is
 // also what reveals the panel in the first place -- it stays hidden until
 // a date has actually been picked.
 function updateCalendarTimePanel() {
+  updateClearDatesBtn();
   const start = startDateInput.value;
-  // Drop-in: the panel is open while any individual day is selected.
-  if (DROP_IN_SERVICES.has(serviceTypeSelect.value)) {
-    if (!dropInDates.size) { calendarTimePanel.hidden = true; return; }
+  const isDrop = DROP_IN_SERVICES.has(serviceTypeSelect.value);
+  // Drop-ins: the panel shows a time grid per selected day, so keep it open
+  // whenever any day is selected (tracked in dropInPlan, not start/end).
+  if (isDrop) {
+    if (!dropInPlan.length) {
+      calendarTimePanel.hidden = true;
+      return;
+    }
     calendarTimePanel.hidden = false;
-    const n = dropInDates.size;
-    calendarTimePanelSummary.textContent = `${n} day${n === 1 ? '' : 's'} selected`;
+    calendarTimePanelSummary.textContent =
+      `${dropInPlan.length} day${dropInPlan.length === 1 ? '' : 's'} selected — pick the time(s) for each below.`;
+    return;
+  }
+  // Day Care: multiple separate days, one drop-off/pick-up time for all.
+  if (serviceTypeSelect.value === 'Day Care') {
+    if (!dayCarePlan.length) {
+      calendarTimePanel.hidden = true;
+      return;
+    }
+    calendarTimePanel.hidden = false;
+    calendarTimePanelSummary.textContent =
+      `${dayCarePlan.length} day${dayCarePlan.length === 1 ? '' : 's'} selected — the same drop-off & pick-up time applies to each.`;
     return;
   }
   if (!start) {
@@ -141,6 +161,26 @@ function updateCalendarTimePanel() {
     : `Selected: ${formatCalendarDate(start)}`;
 }
 
+// A "Clear dates" reset — a guaranteed way to undo any selection (works for
+// both the drop-in plan and an overnight/day-care range).
+const clearDatesBtn = document.getElementById('clearDatesBtn');
+function updateClearDatesBtn() {
+  if (clearDatesBtn) clearDatesBtn.hidden = !(dropInPlan.length > 0 || dayCarePlan.length > 0 || startDateInput.value);
+}
+function clearDateSelection() {
+  dropInPlan = [];
+  dayCarePlan = [];
+  startDateInput.value = '';
+  endDateInput.value = '';
+  selectedCalendarDate = null;
+  selectedCalendarEndDate = null;
+  renderCalendar();
+  if (DROP_IN_SERVICES.has(serviceTypeSelect.value)) renderDropInTimes();
+  updateCalendarTimePanel();
+  updatePriceEstimate();
+}
+if (clearDatesBtn) clearDatesBtn.addEventListener('click', clearDateSelection);
+
 // Clicking an available day drives the real (hidden) startDate/endDate
 // fields and re-runs their change handlers, which load/refresh the drop-in
 // time slots in the panel below -- the calendar is the picker, not a
@@ -148,61 +188,106 @@ function updateCalendarTimePanel() {
 // date range; clicking the start date again clears a previously-set end
 // date back to a single day; any other click starts a fresh selection.
 function selectCalendarDate(dateStr) {
-  // Drop-ins: toggle individual days. Clicking a selected day removes just that
-  // day (others stay); clicking an unselected day adds it, and if days are
-  // already selected, fills the span from the nearest selected day to this one
-  // (so "click 22 then 30" selects 22–30, and you can then click 25 to drop it).
+  // Drop-ins: tapping a day toggles it in the multi-day plan; each selected
+  // day gets its own time grid below (so different days can have different
+  // times). No date range here — that's only for overnight/day care.
   if (DROP_IN_SERVICES.has(serviceTypeSelect.value)) {
-    if (dropInDates.has(dateStr)) {
-      dropInDates.delete(dateStr);
-    } else if (dropInDates.size === 0) {
-      dropInDates.add(dateStr);
-    } else {
-      const arr = [...dropInDates].sort();
-      const nearest = arr.reduce((a, b) => Math.abs(diffDays(b, dateStr)) < Math.abs(diffDays(a, dateStr)) ? b : a);
-      const lo = dateStr < nearest ? dateStr : nearest;
-      const hi = dateStr < nearest ? nearest : dateStr;
-      dateRangeArray(lo, hi).forEach((d) => dropInDates.add(d));
+    const i = dropInPlan.findIndex((p) => p.date === dateStr);
+    if (i >= 0) dropInPlan.splice(i, 1);
+    else {
+      // inherit = use the first day's times (default on for every added day).
+      dropInPlan.push({ date: dateStr, times: [], inherit: true });
+      dropInPlan.sort((a, b) => a.date.localeCompare(b.date));
     }
-    const sorted = [...dropInDates].sort();
-    startDateInput.value = sorted[0] || '';
+    // Keep the hidden (required) startDate satisfied for form submit + pricing.
+    startDateInput.value = dropInPlan[0] ? dropInPlan[0].date : '';
     endDateInput.value = '';
     selectedCalendarDate = null;
     selectedCalendarEndDate = null;
     renderCalendar();
-    renderDropInTimeArea();
+    renderDropInTimes();
     updateCalendarTimePanel();
-    onChange();
+    updatePriceEstimate();
+    // No auto-scroll: keep the calendar in view so more days can be tapped.
     return;
   }
-  if (selectedCalendarEndDate || !selectedCalendarDate) {
-    // Nothing picked yet, or a full range is already set -- this click
-    // starts a fresh selection with the clicked day as the (lone) start.
-    startDateInput.value = dateStr;
+  // Day Care: tap to toggle separate days (they don't have to be
+  // consecutive) — each becomes its own single-day booking. Same drop-off /
+  // pick-up time applies to every day (from the fields below).
+  if (serviceTypeSelect.value === 'Day Care') {
+    const i = dayCarePlan.indexOf(dateStr);
+    if (i >= 0) dayCarePlan.splice(i, 1);
+    else {
+      dayCarePlan.push(dateStr);
+      dayCarePlan.sort((a, b) => a.localeCompare(b));
+    }
+    // Keep the hidden (required) startDate satisfied for form submit + pricing.
+    startDateInput.value = dayCarePlan[0] || '';
     endDateInput.value = '';
-    startDateInput.dispatchEvent(new Event('change'));
-  } else if (dateStr === selectedCalendarDate) {
-    // Clicking the single selected day again clears the selection.
+    selectedCalendarDate = null;
+    selectedCalendarEndDate = null;
+    renderCalendar();
+    updateCalendarTimePanel();
+    updatePriceEstimate();
+    return;
+  }
+  // Overnight: a contiguous date range. Clicking a day toggles its
+  // membership — clicking a selected day removes it (trimming the range from
+  // that end, e.g. clicking the 28 of 22–28 leaves 22–27); clicking an
+  // unselected day grows/forms the range; clicking the only selected day clears.
+  let start = selectedCalendarDate;
+  let end = selectedCalendarEndDate || selectedCalendarDate; // single day: start===end
+
+  if (!start) {
+    start = end = dateStr; // nothing picked -> single day
+  } else if (dateStr < start) {
+    start = dateStr; // earlier than range -> extend start
+  } else if (dateStr > end) {
+    end = dateStr; // later than range -> extend end
+  } else if (dateStr === start && dateStr === end) {
+    start = end = null; // clicked the only selected day -> clear
+  } else if (dateStr === start) {
+    start = addDaysStr(start, 1); // remove first day
+  } else if (dateStr === end) {
+    end = addDaysStr(end, -1); // remove last day
+  } else {
+    end = addDaysStr(dateStr, -1); // middle day -> trim the stay to end before it
+  }
+
+  setOvernightRange(start, end);
+  updateCalendarTimePanel();
+  updatePriceEstimate();
+}
+
+// Shift a YYYY-MM-DD string by n days.
+function addDaysStr(dateStr, n) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + n);
+  return ymd(dt.getFullYear(), dt.getMonth(), dt.getDate());
+}
+
+// Apply an overnight/day-care range to the hidden inputs + selection state and
+// re-render. `start`/`end` may be null (cleared); a single day has start===end.
+function setOvernightRange(start, end) {
+  if (!start) {
     startDateInput.value = '';
     endDateInput.value = '';
-    startDateInput.dispatchEvent(new Event('change'));
+    selectedCalendarDate = null;
+    selectedCalendarEndDate = null;
   } else {
-    // One start is set and a different day was clicked -- form a range and
-    // auto-order the two clicks, so it doesn't matter whether the earlier
-    // or later date was picked first (clients shouldn't have to pick the
-    // "end" before the "start").
-    const start = dateStr < selectedCalendarDate ? dateStr : selectedCalendarDate;
-    const end = dateStr < selectedCalendarDate ? selectedCalendarDate : dateStr;
+    const single = !end || end === start;
     startDateInput.value = start;
-    endDateInput.value = end;
-    startDateInput.dispatchEvent(new Event('change'));
-    endDateInput.dispatchEvent(new Event('change'));
+    endDateInput.value = single ? '' : end;
+    endDateInput.min = start;
+    selectedCalendarDate = start;
+    selectedCalendarEndDate = single ? null : end;
   }
-  updateCalendarTimePanel();
-  calendarTimePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  renderCalendar();
 }
 
 async function renderCalendar() {
+  const calEl = document.getElementById('availabilityCalendar');
+  const monthLabel = document.getElementById('calMonthLabel');
   const year = calMonth.getFullYear();
   const month = calMonth.getMonth();
   monthLabel.textContent = calMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -227,7 +312,7 @@ async function renderCalendar() {
   // Overnight/Day Care bookings take up Misti's whole day, but a Drop-In
   // visit or walk only needs a short time slot, so those days still show
   // as available when Drop-In is the selected service.
-  const serviceType = serviceTypeSelect.value;
+  const serviceType = document.getElementById('serviceType').value;
   const isDropIn = DROP_IN_SERVICES.has(serviceType);
 
   calEl.innerHTML = '';
@@ -257,8 +342,13 @@ async function renderCalendar() {
         : dateStr === selectedCalendarDate
     );
     if (inSelectedRange) cell.classList.add('cal-selected');
-    // Drop-in: highlight every individually-selected day.
-    if (isDropIn && !unavailableForService && dropInDates.has(dateStr)) cell.classList.add('cal-selected');
+    // Days already added to a multi-day drop-in / day-care request stay highlighted.
+    if (!unavailableForService && (
+      (isDropIn && dropInPlan.some((p) => p.date === dateStr)) ||
+      (serviceType === 'Day Care' && dayCarePlan.includes(dateStr))
+    )) {
+      cell.classList.add('cal-planned');
+    }
     cell.textContent = day;
     if (!unavailableForService) {
       cell.addEventListener('click', () => selectCalendarDate(dateStr));
@@ -267,237 +357,15 @@ async function renderCalendar() {
   }
 }
 
-  async function fetchDropInSlots(date) {
-    if (dropInSlotCache[date]) return dropInSlotCache[date];
-    try {
-      const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${date}${slotParams()}`);
-      if (!res.ok) return null;
-      const slots = (await res.json()).slots || [];
-      dropInSlotCache[date] = slots;
-      return slots;
-    } catch { return null; }
-  }
-
-  async function renderDropInTimeArea() {
-    dropinSlots.style.display = 'block';
-    const days = [...dropInDates].sort();
-    if (!days.length) {
-      dropinSlots.innerHTML = '<p class="slots-loading">Tap one or more days on the calendar above to pick times.</p>';
-      return;
-    }
-    dropinSlots.innerHTML = '<p class="slots-loading">Loading times…</p>';
-    const firstLabel = formatCalendarDate(days[0]);
-    const slotsByDay = {};
-    await Promise.all(days.map(async (date) => { slotsByDay[date] = await fetchDropInSlots(date); }));
-    dropinSlots.innerHTML = '';
-    days.forEach((date, i) => {
-      const head = document.createElement('div');
-      head.style.cssText = 'font-weight:700;margin:0.7rem 0 0.2rem;';
-      head.textContent = formatCalendarDate(date);
-      dropinSlots.appendChild(head);
-      const slots = slotsByDay[date];
-      const availableSet = slots ? new Set(slots.filter((s) => s.available).map((s) => s.time)) : null;
-      let inheriting = false;
-      if (i > 0) {
-        if (dropInInherit[date] === undefined) dropInInherit[date] = true;
-        const conflictTimes = availableSet ? [...selectedSlots].filter((t) => !availableSet.has(t)) : [];
-        if (conflictTimes.length) {
-          dropInInherit[date] = false;
-          if (!dropInPerDayTouched.has(date)) {
-            dropInPerDay[date] = [...selectedSlots].filter((t) => availableSet.has(t));
-          }
-          const row = document.createElement('div');
-          row.className = 'inherit-row inherit-conflict';
-          row.innerHTML =
-            `<span class="inherit-x">✕</span>` +
-            `<span>Can’t use the same times as ${firstLabel} — ` +
-            `${conflictTimes.map(formatTime).join(', ')} ` +
-            `${conflictTimes.length === 1 ? 'is' : 'are'} already booked this day. Pick open times below.</span>`;
-          dropinSlots.appendChild(row);
-        } else {
-          inheriting = dropInInherit[date] !== false;
-          const row = document.createElement('label');
-          row.className = 'inherit-row';
-          row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:0.1rem 0 0.4rem;cursor:pointer;background:var(--cream-soft,#f3ecdd);padding:0.45rem 0.7rem;border-radius:10px;';
-          const span = document.createElement('span');
-          span.textContent = `Use the same times as ${firstLabel}`;
-          const cb = document.createElement('input');
-          cb.type = 'checkbox';
-          cb.checked = inheriting;
-          cb.addEventListener('change', () => { dropInInherit[date] = cb.checked; renderDropInTimeArea(); onChange(); });
-          row.appendChild(span); row.appendChild(cb);
-          dropinSlots.appendChild(row);
-        }
-      }
-      if (i === 0 || !inheriting) {
-        const grid = document.createElement('div');
-        grid.className = 'dropin-slots';
-        grid.innerHTML = '<p class="slots-loading">Loading times…</p>';
-        dropinSlots.appendChild(grid);
-        if (i === 0) {
-          loadDropInGrid(date, grid, selectedSlots, true, slots, true);
-        } else {
-          if (!dropInPerDay[date]) dropInPerDay[date] = [];
-          loadDropInGrid(date, grid, dropInPerDay[date], false, slots);
-        }
-      }
-    });
-  }
-
-  async function loadDropInGrid(date, grid, store, isSet, prefetched = undefined, isFirstDay = false) {
-    try {
-      let slots = prefetched;
-      if (slots === undefined) {
-        const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${date}${slotParams()}`);
-        if (!res.ok) throw new Error('bad');
-        slots = (await res.json()).slots || [];
-      }
-      if (slots == null) throw new Error('bad');
-      grid.innerHTML = '';
-      slots.forEach((s) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = `slot-btn ${s.available ? 'slot-available' : 'slot-booked'}`;
-        btn.textContent = formatTime(s.time);
-        const has = isSet ? store.has(s.time) : store.includes(s.time);
-        if (has) btn.classList.add('slot-selected');
-        btn.disabled = !s.available;
-        btn.addEventListener('click', () => {
-          if (isSet) { store.has(s.time) ? store.delete(s.time) : store.add(s.time); }
-          else { const i = store.indexOf(s.time); i >= 0 ? store.splice(i, 1) : store.push(s.time); dropInPerDayTouched.add(date); }
-          btn.classList.toggle('slot-selected');
-          onChange();
-          if (isFirstDay && dropInDates.size > 1) renderDropInTimeArea();
-        });
-        grid.appendChild(btn);
-      });
-    } catch { grid.innerHTML = '<p class="slots-error">Could not load times — please try again.</p>'; }
-  }
-
-  function updateTimeFields() {
-    const serviceType = serviceTypeSelect.value;
-    const isDropIn = DROP_IN_SERVICES.has(serviceType);
-    const isOvernight = serviceType === 'Overnight Stay';
-    const isDayCare = serviceType === 'Day Care';
-    if (isOvernight || isDayCare) {
-      startTimeGroup.hidden = false;
-      startTimeLabel.textContent = 'Drop-off Time';
-      endTimeGroup.hidden = false;
-      dropinSlotsGroup.hidden = true;
-      dropinSlots.innerHTML = '';
-    } else if (isDropIn) {
-      startTimeGroup.hidden = true;
-      endTimeGroup.hidden = true;
-      endTimeInput.value = '';
-      dropinSlotsGroup.hidden = false;
-      selectedSlots.clear();
-      dropInDates.clear();
-      dropInPerDay = {};
-      dropInInherit = {};
-      dropInSlotCache = {};
-      dropInPerDayTouched = new Set();
-      startDateInput.value = '';
-      endDateInput.value = '';
-      renderDropInTimeArea();
-    } else {
-      startTimeGroup.hidden = false;
-      startTimeLabel.textContent = 'Preferred Time';
-      endTimeGroup.hidden = true;
-      endTimeInput.value = '';
-      dropinSlotsGroup.hidden = true;
-      dropinSlots.innerHTML = '';
-    }
-  }
-
-  prevBtn.addEventListener('click', () => { calMonth.setMonth(calMonth.getMonth() - 1); renderCalendar(); });
-  nextBtn.addEventListener('click', () => { calMonth.setMonth(calMonth.getMonth() + 1); renderCalendar(); });
-  serviceTypeSelect.addEventListener('change', () => {
-    startTimeInput.value = '';
-    updateTimeFields();
-    onServiceChange();
-    renderCalendar();
-  });
-  startDateInput.addEventListener('change', () => {
-    startTimeInput.value = '';
-    selectedCalendarDate = startDateInput.value || null;
-    selectedCalendarEndDate = endDateInput.value || null;
-    endDateInput.min = startDateInput.value || '';
-    if (endDateInput.value && startDateInput.value && endDateInput.value < startDateInput.value) {
-      endDateInput.value = '';
-      selectedCalendarEndDate = null;
-    }
-    renderCalendar();
-    if (DROP_IN_SERVICES.has(serviceTypeSelect.value)) renderDropInTimeArea();
-    onChange();
-    updateCalendarTimePanel();
-  });
-  endDateInput.addEventListener('change', () => {
-    if (startDateInput.value && endDateInput.value && endDateInput.value < startDateInput.value) {
-      alert('End date cannot be before the start date.');
-      endDateInput.value = '';
-      selectedCalendarEndDate = null;
-      renderCalendar();
-      updateCalendarTimePanel();
-      return;
-    }
-    selectedCalendarEndDate = endDateInput.value || null;
-    renderCalendar();
-    onChange();
-    updateCalendarTimePanel();
-  });
-  startTimeInput.addEventListener('change', onChange);
-  endTimeInput.addEventListener('change', onChange);
-
-  populateTimeOptions(startTimeInput);
-  populateTimeOptions(endTimeInput);
-  updateTimeFields();
+document.getElementById('calPrev').addEventListener('click', () => {
+  calMonth.setMonth(calMonth.getMonth() - 1);
   renderCalendar();
-
-  return {
-    renderCalendar,
-    updateTimeFields,
-    renderDropInTimeArea,
-    updateCalendarTimePanel,
-    get serviceType() { return serviceTypeSelect.value; },
-    // Toggle one of the first day's shared drop-in times (rebook "usual times").
-    toggleSlot(time) {
-      if (selectedSlots.has(time)) selectedSlots.delete(time);
-      else selectedSlots.add(time);
-      renderDropInTimeArea();
-      onChange();
-    },
-    hasSlot(time) { return selectedSlots.has(time); },
-    reset() {
-      selectedSlots.clear();
-      dropInDates.clear();
-      dropInPerDay = {};
-      dropInInherit = {};
-      dropInSlotCache = {};
-      dropInPerDayTouched = new Set();
-      selectedCalendarDate = null;
-      selectedCalendarEndDate = null;
-      startDateInput.value = '';
-      endDateInput.value = '';
-      startTimeInput.value = '';
-      endTimeInput.value = '';
-      renderCalendar();
-      renderDropInTimeArea();
-      updateCalendarTimePanel();
-    },
-    getSelection() {
-      return {
-        serviceType: serviceTypeSelect.value,
-        startDate: startDateInput.value,
-        endDate: endDateInput.value,
-        startTime: startTimeInput.value,
-        endTime: endTimeInput.value,
-        dropInDates: [...dropInDates].sort(),
-        selectedSlots: [...selectedSlots],
-        effTimes: (date, i) => dropInEffTimes(date, i),
-      };
-    },
-  };
-}
+});
+document.getElementById('calNext').addEventListener('click', () => {
+  calMonth.setMonth(calMonth.getMonth() + 1);
+  renderCalendar();
+});
+renderCalendar();
 
 // ── Drop-in visit time slots ────────────────────────────────────────────
 // Each drop-in visit books a single 30-minute slot.
@@ -651,22 +519,404 @@ function populateTimeOptions(select) {
     select.appendChild(opt);
   }
 }
+populateTimeOptions(startTimeInput);
+populateTimeOptions(endTimeInput);
 
-// The new-client booking form's calendar instance. onChange keeps the live
-// price preview in sync; onServiceChange also refreshes drop-in distance pricing.
-const mainCal = createBookingCalendar({
-  serviceTypeSelect, startDateInput, endDateInput, startTimeInput, endTimeInput,
-  startTimeGroup, startTimeLabel, endTimeGroup, dropinSlotsGroup, dropinSlots,
-  calendarTimePanel: document.getElementById('calendarTimePanel'),
-  calendarTimePanelSummary: document.getElementById('calendarTimePanelSummary'),
-  calEl: document.getElementById('availabilityCalendar'),
-  monthLabel: document.getElementById('calMonthLabel'),
-  prevBtn: document.getElementById('calPrev'),
-  nextBtn: document.getElementById('calNext'),
-  onChange: () => updatePriceEstimate(),
-  onServiceChange: () => updateDistancePricing().then(updatePriceEstimate),
+// A drop-in visit can cover several check-ins on the same day, so the
+// slot picker allows selecting more than one time slot.
+let selectedSlots = new Set();
+
+async function renderTimeSlots() {
+  const date = startDateInput.value;
+
+  if (!date) {
+    dropinSlots.innerHTML = '<p class="slots-loading">Pick a date above to see open times.</p>';
+    return;
+  }
+
+  dropinSlots.innerHTML = '<p class="slots-loading">Loading times…</p>';
+  try {
+    const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${date}`);
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    dropinSlots.innerHTML = '';
+    (data.slots || []).forEach(s => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `slot-btn ${s.available ? 'slot-available' : 'slot-booked'}`;
+      btn.textContent = formatTime(s.time);
+      btn.disabled = !s.available;
+      if (selectedSlots.has(s.time)) btn.classList.add('slot-selected');
+      btn.addEventListener('click', () => {
+        if (selectedSlots.has(s.time)) {
+          selectedSlots.delete(s.time);
+          btn.classList.remove('slot-selected');
+        } else {
+          selectedSlots.add(s.time);
+          btn.classList.add('slot-selected');
+        }
+        updatePriceEstimate();
+      });
+      dropinSlots.appendChild(btn);
+    });
+  } catch (err) {
+    dropinSlots.innerHTML = `<p class="slots-error">Could not load times (${err.message || err}) — <button type="button" id="retryTimeSlots" class="btn btn-outline">Try again</button></p>`;
+    document.getElementById('retryTimeSlots')?.addEventListener('click', renderTimeSlots);
+  }
+}
+
+// ── Multi-day drop-in plan ──────────────────────────────────────────────
+// Each drop-in day is requested as its own booking row (the server has no
+// per-day-times concept on one row); a generated group_id ties them so admin
+// + the app show them as a single request. The plan lets a client stack up
+// several days, each with its own time(s), before sending. (dropInPlan itself
+// is declared near the top so renderCalendar can read it at load.)
+const addDropInDayBtn = document.getElementById('addDropInDay');
+const dropInPlanList = document.getElementById('dropInPlanList');
+
+function genGroupId() {
+  return `grp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// Add/replace a day's times in a plan, keeping it date-sorted.
+function upsertPlanDay(plan, date, times) {
+  const existing = plan.find((p) => p.date === date);
+  if (existing) existing.times = times;
+  else plan.push({ date, times });
+  plan.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function renderPlanList(listEl, plan, onRemove) {
+  if (!plan.length) {
+    listEl.innerHTML = '';
+    return;
+  }
+  listEl.innerHTML = '<p class="dropin-plan__title">Days in this request:</p>';
+  plan.forEach((p) => {
+    const row = document.createElement('div');
+    row.className = 'dropin-plan__row';
+    const label = document.createElement('span');
+    label.className = 'dropin-plan__day';
+    label.textContent = `${formatCalendarDate(p.date)} — ${p.times.map(formatTime).join(', ')}`;
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'dropin-plan__remove';
+    rm.textContent = 'Remove';
+    rm.addEventListener('click', () => onRemove(p.date));
+    row.appendChild(label);
+    row.appendChild(rm);
+    listEl.appendChild(row);
+  });
+}
+
+// The old "Add this day" button + summary list aren't used by the per-day-grid
+// model (each selected day shows its own grid). Hide them if present.
+if (addDropInDayBtn) addDropInDayBtn.style.display = 'none';
+if (dropInPlanList) dropInPlanList.style.display = 'none';
+
+// Remove a day from the plan (used by the chips' remove buttons and the
+// calendar toggle) and refresh everything that depends on the selection.
+function removeDropInDay(date) {
+  dropInPlan = dropInPlan.filter((p) => p.date !== date);
+  startDateInput.value = dropInPlan[0] ? dropInPlan[0].date : '';
+  endDateInput.value = '';
+  renderCalendar();
+  renderDropInTimes();
+  updateCalendarTimePanel();
+  updatePriceEstimate();
+}
+
+// Build a row of removable chips for the selected days, so a wrongly-picked
+// day can always be deselected right here (not only on the calendar).
+function buildDayChips(plan, onRemove) {
+  const wrap = document.createElement('div');
+  wrap.className = 'dropin-chips';
+  plan.forEach((p) => {
+    const chip = document.createElement('span');
+    chip.className = 'dropin-chip';
+    chip.textContent = formatCalendarDate(p.date);
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'dropin-chip__x';
+    x.setAttribute('aria-label', `Remove ${p.date}`);
+    x.textContent = '×';
+    x.addEventListener('click', () => onRemove(p.date));
+    chip.appendChild(x);
+    wrap.appendChild(chip);
+  });
+  return wrap;
+}
+
+// The "same times for all days?" toggle, shown only when 2+ days are picked.
+function buildSameTimesToggle(currentVal, onChange) {
+  const wrap = document.createElement('div');
+  wrap.className = 'same-times-toggle';
+  const q = document.createElement('p');
+  q.className = 'same-times-toggle__q';
+  q.textContent = 'Use the same time(s) for every day?';
+  wrap.appendChild(q);
+  const opts = document.createElement('div');
+  opts.className = 'same-times-toggle__opts';
+  [['Yes — same times', true], ['No — pick per day', false]].forEach(([label, val]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `slot-btn ${currentVal === val ? 'slot-selected' : 'slot-available'}`;
+    b.textContent = label;
+    b.addEventListener('click', () => onChange(val));
+    opts.appendChild(b);
+  });
+  wrap.appendChild(opts);
+  return wrap;
+}
+
+// "Jul 29, Wed" heading; "Jul 29" short label for the inherit toggle.
+function dayHeading(date) {
+  const [y, m, d] = date.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  const md = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const wd = dt.toLocaleDateString('en-US', { weekday: 'short' });
+  return `${md}, ${wd}`;
+}
+function shortDay(date) {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+// A "Use same drop-in times as <first day>" on/off switch for a follow-on day.
+function buildInheritToggle(day, firstLabel, onChange) {
+  const row = document.createElement('label');
+  row.className = 'inherit-toggle';
+  const span = document.createElement('span');
+  span.textContent = `Use same drop-in times as ${firstLabel}`;
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.className = 'inherit-switch';
+  input.checked = day.inherit !== false;
+  input.addEventListener('change', () => {
+    day.inherit = input.checked;
+    onChange();
+  });
+  row.appendChild(span);
+  row.appendChild(input);
+  return row;
+}
+
+// One section per selected day. The first day picks times; each later day has
+// a "use same times as the first day" toggle (on by default), and only shows
+// its own horizontally-scrolling time chips when that toggle is off.
+function renderDropInTimes() {
+  if (!dropInPlan.length) {
+    dropinSlots.innerHTML =
+      '<p class="slots-loading">Tap one or more days on the calendar above to pick drop-in times.</p>';
+    return;
+  }
+  dropinSlots.innerHTML = '';
+  const firstLabel = shortDay(dropInPlan[0].date);
+  dropInPlan.forEach((day, i) => {
+    const section = document.createElement('div');
+    section.className = 'dropin-day';
+
+    const head = document.createElement('div');
+    head.className = 'dropin-day__head';
+    const title = document.createElement('span');
+    title.className = 'dropin-day__date';
+    title.textContent = dayHeading(day.date);
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'dropin-plan__remove';
+    rm.textContent = 'Remove';
+    rm.addEventListener('click', () => removeDropInDay(day.date));
+    head.appendChild(title);
+    head.appendChild(rm);
+    section.appendChild(head);
+
+    const sub = document.createElement('p');
+    sub.className = 'dropin-day__sub';
+    sub.textContent = 'Add one or more drop-in times';
+    section.appendChild(sub);
+
+    if (i > 0) section.appendChild(buildInheritToggle(day, firstLabel, () => { renderDropInTimes(); updatePriceEstimate(); }));
+
+    if (i === 0 || day.inherit === false) {
+      const grid = document.createElement('div');
+      grid.className = 'dropin-slots dropin-day__slots';
+      grid.innerHTML = '<p class="slots-loading">Loading times…</p>';
+      section.appendChild(grid);
+      loadDropInDaySlots(day, grid);
+    }
+    dropinSlots.appendChild(section);
+  });
+}
+
+// The effective times for a day within a plan: a follow-on day with its toggle
+// on uses the first day's times; otherwise its own.
+function effTimesFor(plan, day, i) {
+  return i > 0 && day.inherit !== false ? plan[0].times : day.times;
+}
+function effectiveTimes(day, i) {
+  return effTimesFor(dropInPlan, day, i);
+}
+
+// Render a slot grid backed by a times array; `availableTimes` (a Set) decides
+// which slots are enabled. Tapping toggles the time in `times`.
+function renderSlotGrid(grid, allTimes, availableTimes, times, onChange) {
+  grid.innerHTML = '';
+  allTimes.forEach((t) => {
+    const ok = availableTimes.has(t);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `slot-btn ${ok ? 'slot-available' : 'slot-booked'}`;
+    btn.textContent = formatTime(t);
+    btn.disabled = !ok;
+    if (times.includes(t)) btn.classList.add('slot-selected');
+    btn.addEventListener('click', () => {
+      const i = times.indexOf(t);
+      if (i >= 0) {
+        times.splice(i, 1);
+        btn.classList.remove('slot-selected');
+      } else {
+        times.push(t);
+        btn.classList.add('slot-selected');
+      }
+      if (onChange) onChange();
+    });
+    grid.appendChild(btn);
+  });
+}
+
+async function loadDropInDaySlots(day, grid) {
+  try {
+    const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${day.date}`);
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    const all = (data.slots || []).map((s) => s.time);
+    const avail = new Set((data.slots || []).filter((s) => s.available).map((s) => s.time));
+    renderSlotGrid(grid, all, avail, day.times, updatePriceEstimate);
+  } catch (err) {
+    grid.innerHTML = '<p class="slots-error">Could not load times — please try again.</p>';
+  }
+}
+
+// Same-times mode: a slot is offered only if it's open on EVERY selected day.
+async function loadSharedDropInSlots(grid) {
+  try {
+    const datasets = await Promise.all(
+      dropInPlan.map((p) =>
+        fetch(`${BOOKING_API}/api/availability/slots?date=${p.date}`).then((r) => {
+          if (!r.ok) throw new Error('bad');
+          return r.json();
+        })
+      )
+    );
+    const all = (datasets[0]?.slots || []).map((s) => s.time);
+    const avail = new Set(
+      all.filter((t) =>
+        datasets.every((d) => (d.slots || []).some((s) => s.time === t && s.available))
+      )
+    );
+    // Drop any shared picks that aren't open on every day.
+    dropInSharedTimes = dropInSharedTimes.filter((t) => avail.has(t));
+    renderSlotGrid(grid, all, avail, dropInSharedTimes, updatePriceEstimate);
+  } catch (err) {
+    grid.innerHTML = '<p class="slots-error">Could not load times — please try again.</p>';
+  }
+}
+
+function updateTimeFields() {
+  const serviceType = serviceTypeSelect.value;
+  const isDropIn = DROP_IN_SERVICES.has(serviceType);
+  const isOvernight = serviceType === 'Overnight Stay';
+  const isDayCare = serviceType === 'Day Care';
+
+  if (isOvernight || isDayCare) {
+    startTimeGroup.hidden = false;
+    startTimeLabel.textContent = 'Drop-off Time';
+    endTimeGroup.hidden = false;
+    dropinSlotsGroup.hidden = true;
+    dropinSlots.innerHTML = '';
+    // Leaving drop-in: drop any drop-in day plan. Day Care keeps its own plan.
+    dropInPlan = [];
+    if (!isDayCare) dayCarePlan = [];
+  } else if (isDropIn) {
+    startTimeGroup.hidden = true;
+    endTimeGroup.hidden = true;
+    endTimeInput.value = '';
+    dropinSlotsGroup.hidden = false;
+    dropInPlan = [];
+    dayCarePlan = [];
+    dropInSameTimes = true;
+    dropInSharedTimes = [];
+    startDateInput.value = '';
+    endDateInput.value = '';
+    renderDropInTimes();
+  } else {
+    startTimeGroup.hidden = false;
+    startTimeLabel.textContent = 'Preferred Time';
+    endTimeGroup.hidden = true;
+    endTimeInput.value = '';
+    dropinSlotsGroup.hidden = true;
+    dropinSlots.innerHTML = '';
+    dropInPlan = [];
+    dayCarePlan = [];
+  }
+}
+
+serviceTypeSelect.addEventListener('change', () => {
+  startTimeInput.value = '';
+  // The three services pick dates differently (drop-in plan, day-care days,
+  // overnight range), so start from a clean selection on every switch.
+  dropInPlan = [];
+  dayCarePlan = [];
+  selectedCalendarDate = null;
+  selectedCalendarEndDate = null;
+  startDateInput.value = '';
+  endDateInput.value = '';
+  updateTimeFields();
+  updateDistancePricing().then(updatePriceEstimate);
+  renderCalendar();
+  updateCalendarTimePanel();
 });
+startDateInput.addEventListener('change', () => {
+  startTimeInput.value = '';
+  selectedCalendarDate = startDateInput.value || null;
+  // Keep the end-selection state in sync with the field. Without this, starting
+  // a fresh single selection (which clears endDate) left a STALE
+  // selectedCalendarEndDate behind, so the next click misbehaved and dates
+  // couldn't be deselected/changed without refreshing the page.
+  selectedCalendarEndDate = endDateInput.value || null;
+  // End date can't be before the (possibly new) start date -- this also
+  // nudges native date pickers to open showing the same month as the
+  // start date instead of whatever month they last happened to be on.
+  endDateInput.min = startDateInput.value || '';
+  if (endDateInput.value && startDateInput.value && endDateInput.value < startDateInput.value) {
+    endDateInput.value = '';
+    selectedCalendarEndDate = null;
+  }
+  renderCalendar();
+  if (DROP_IN_SERVICES.has(serviceTypeSelect.value)) {
+    renderDropInTimes();
+  }
+  updatePriceEstimate();
+  updateCalendarTimePanel();
+});
+endDateInput.addEventListener('change', () => {
+  if (startDateInput.value && endDateInput.value && endDateInput.value < startDateInput.value) {
+    alert('End date cannot be before the start date.');
+    endDateInput.value = '';
+    selectedCalendarEndDate = null;
+    renderCalendar();
+    updateCalendarTimePanel();
+    return;
+  }
+  selectedCalendarEndDate = endDateInput.value || null;
+  renderCalendar();
+  updatePriceEstimate();
+  updateCalendarTimePanel();
+});
+startTimeInput.addEventListener('change', updatePriceEstimate);
+endTimeInput.addEventListener('change', updatePriceEstimate);
 startDateInput.required = true;
+updateTimeFields();
 
 // ── Booking form -> email + pre-filled printable contract ──────────────────
 const bookingForm = document.getElementById('bookingForm');
@@ -678,27 +928,71 @@ const bookingForm = document.getElementById('bookingForm');
 const ownerEmailInput = document.getElementById('ownerEmail');
 const ownerPhoneInput = document.getElementById('ownerPhone');
 const returningClientNote = document.getElementById('returningClientNote');
-let returningClientChecked = false;
+// Remember the last email|phone we looked up so we re-check when the client
+// corrects their number, but don't hammer the endpoint on every blur.
+let lastLookupKey = '';
+
+// A prominent "you already have a profile — sign in" banner, injected once
+// right after the phone field and shown when the entered phone matches an
+// existing client.
+let returningBanner = null;
+function showReturningBanner(name, phone) {
+  if (!returningBanner) {
+    returningBanner = document.createElement('div');
+    returningBanner.id = 'returningClientBanner';
+    returningBanner.className = 'returning-banner';
+    returningClientNote.insertAdjacentElement('afterend', returningBanner);
+  }
+  const who = name ? name.split(' ')[0] : 'there';
+  returningBanner.innerHTML = '';
+  const p = document.createElement('p');
+  p.textContent = `Welcome back, ${who}! It looks like you already have a profile with us. Please sign in instead of filling this out again — your pets, address and details are already saved.`;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn-primary';
+  btn.textContent = 'Sign in instead →';
+  btn.addEventListener('click', () => {
+    const signInPhone = document.getElementById('signInPhone');
+    if (signInPhone) signInPhone.value = phone;
+    closeBookingModal();
+    showSignInStatus('');
+    openPetSignInModal();
+    const petNameEl = document.getElementById('signInPetName');
+    if (petNameEl) petNameEl.focus();
+  });
+  returningBanner.appendChild(p);
+  returningBanner.appendChild(btn);
+  returningBanner.hidden = false;
+}
+function hideReturningBanner() {
+  if (returningBanner) returningBanner.hidden = true;
+}
 
 async function tryReturningClientLookup() {
   const email = ownerEmailInput.value.trim();
   const phone = ownerPhoneInput.value.trim();
-  if (!email || !phone || returningClientChecked) return;
-  returningClientChecked = true;
+  // Phone alone is enough to recognise a returning client now — an existing
+  // profile may have no email on file, or a different one.
+  if (!phone) return;
+  const key = email.toLowerCase() + '|' + phone.replace(/\D/g, '');
+  if (key === lastLookupKey) return;
+  lastLookupKey = key;
 
   try {
-    const res = await fetch(`${BOOKING_API}/api/client-lookup?email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}`);
+    const qs = new URLSearchParams({ phone });
+    if (email) qs.set('email', email);
+    const res = await fetch(`${BOOKING_API}/api/client-lookup?${qs.toString()}`);
     if (!res.ok) return;
     const data = await res.json();
-    if (!data.found) return;
+    if (!data.found) { hideReturningBanner(); return; }
 
     const fillIfEmpty = (el, value) => {
       if (el && !el.value && value) el.value = value;
     };
 
     fillIfEmpty(addressInput, data.address);
-    for (const [key, value] of Object.entries(data.fields || {})) {
-      const el = bookingForm.elements[key];
+    for (const [k, value] of Object.entries(data.fields || {})) {
+      const el = bookingForm.elements[k];
       if (!el) continue;
       if (el.tagName === 'SELECT' || el.type === 'date') {
         if (!el.value) el.value = value;
@@ -708,7 +1002,16 @@ async function tryReturningClientLookup() {
     }
 
     if (addressInput.value) updateDistancePricing();
-    returningClientNote.textContent = "Welcome back! We've filled in your saved info — please review and update anything that's changed.";
+
+    if (data.existingClient) {
+      // They already have a saved profile — steer them to sign in rather than
+      // creating a second one.
+      returningClientNote.textContent = '';
+      showReturningBanner(data.ownerName, phone);
+    } else {
+      hideReturningBanner();
+      returningClientNote.textContent = "Welcome back! We've filled in your saved info — please review and update anything that's changed.";
+    }
   } catch {
     // lookup is a convenience feature — fail silently
   }
@@ -841,7 +1144,11 @@ const priceEstimateEl = document.getElementById('priceEstimate');
 function updatePriceEstimate() {
   const serviceType = serviceTypeSelect.value;
   const startDate = startDateInput.value;
-  if (!serviceType || !startDate || addressOutOfRange) {
+  const isDropInService = serviceType === 'Drop-In Visit';
+  // Drop-ins can have a plan of days even with no "current" date selected.
+  const isDayCareService = serviceType === 'Day Care';
+  if (!serviceType || addressOutOfRange ||
+      (!startDate && !(isDropInService && dropInPlan.length) && !(isDayCareService && dayCarePlan.length))) {
     priceEstimateEl.hidden = true;
     return;
   }
@@ -864,7 +1171,8 @@ function updatePriceEstimate() {
     text = `Estimated total: $${rate}/night × ${nights} night${nights === 1 ? '' : 's'} = $${(rate * nights + over24Fee).toFixed(2)}${additionalDogNote}${over24Note}`;
   } else if (serviceType === 'Day Care') {
     const rate = (isPuppy ? 45 : RATE_INFO['Day Care'].rate) + additionalDogAddon;
-    const days = (endDate && endDate !== startDate) ? nights + 1 : 1;
+    // Day Care is now a set of separate chosen days (dayCarePlan).
+    const days = dayCarePlan.length || 1;
     text = `Estimated total: $${rate}/day × ${days} day${days === 1 ? '' : 's'} = $${(rate * days).toFixed(2)}${additionalDogNote}`;
   } else if (serviceType === 'Drop-In Visit') {
     if (!distanceMilesInput.value) {
@@ -872,13 +1180,13 @@ function updatePriceEstimate() {
       return;
     }
     const isFar = parseFloat(distanceMilesInput.value) >= 5;
-    const sel = mainCal.getSelection();
-    const dDays = sel.dropInDates;
-    // Sum each day's effective times (inherited days use the first day's set).
-    let totalVisits = dDays.length
-      ? dDays.reduce((n, dt, i) => n + sel.effTimes(dt, i).length, 0)
-      : Math.max(sel.selectedSlots.length, 1) * ((endDate && endDate !== startDate) ? nights + 1 : 1);
-    if (totalVisits === 0) { priceEstimateEl.hidden = true; return; }
+    // Total visits = every time across all days (a day inheriting the first
+    // day's times counts those).
+    const totalVisits = dropInPlan.reduce((sum, day, i) => sum + effectiveTimes(day, i).length, 0);
+    if (totalVisits === 0) {
+      priceEstimateEl.hidden = true;
+      return;
+    }
     const extended = totalVisits >= 14;
     const rates = extended ? DROP_IN_EXTENDED_RATES : DROP_IN_RATES;
     const rate = (isFar ? rates.far : rates.near) + (isPuppy ? PUPPY_ADDON : 0);
@@ -966,6 +1274,8 @@ function ratesTables() {
     <caption>Drop-Ins at Owner's House</caption>
     <tr><td>Drop-In 30 minutes &lt; 5 miles</td><td>$16.00</td></tr>
     <tr><td>Drop-In 30 minutes &gt; 5 miles</td><td>$18.00</td></tr>
+    <tr><td>Drop-In 60 minutes &lt; 5 miles</td><td>$26.00</td></tr>
+    <tr><td>Drop-In 60 minutes &gt; 5 miles</td><td>$28.00</td></tr>
     <tr><td>Additional Dog</td><td>+$8.00</td></tr>
     <tr><td>Puppy</td><td>+$4.00 to rate above</td></tr>
     <tr><td>Extended Rate 30 minutes (14+ visits) &lt; 5 miles</td><td>$15.00</td></tr>
@@ -1082,7 +1392,6 @@ function buildContractHtml(d) {
     dailyTotal = `$${rate.toFixed(2)}`;
     visitTotal = `$${(rate * days).toFixed(2)}`;
   } else if (isDropIn) {
-    const distanceKnown = d.distanceMiles !== undefined && d.distanceMiles !== '' && !Number.isNaN(parseFloat(d.distanceMiles));
     const isFar = parseFloat(d.distanceMiles) >= 5;
     const daySpan = (d.endDate && d.endDate !== d.startDate) ? nights + 1 : 1;
     const totalVisits = visitCount * daySpan;
@@ -1091,24 +1400,17 @@ function buildContractHtml(d) {
     // Flat per-visit rate -- covers the whole household at that visit,
     // regardless of how many pets are there (per-dog addons only apply
     // to Overnight/Day Care, where each pet occupies its own space).
-    // If the driving-distance lookup never ran (e.g. the booking API was
-    // unreachable), don't silently bill the cheaper near rate -- flag it
-    // so the rate gets confirmed manually instead of being wrong unnoticed.
-    rate = (distanceKnown ? (isFar ? rates.far : rates.near) : rates.near) + (isPuppy ? PUPPY_ADDON : 0);
-    unit = distanceKnown
-      ? `per visit (30 min, ${isFar ? '5+' : 'under 5'} mi from Misti's home${extended ? ', extended rate (14+ visits in this request)' : ''}${isPuppy ? ' + puppy add-on' : ''})`
-      : `per visit (30 min) -- DISTANCE UNKNOWN, CONFIRM RATE BEFORE SENDING${isPuppy ? ' + puppy add-on' : ''}`;
+    rate = (isFar ? rates.far : rates.near) + (isPuppy ? PUPPY_ADDON : 0);
+    unit = `per visit (30 min, ${isFar ? '5+' : 'under 5'} mi from Misti's home${extended ? ', extended rate (14+ visits in this request)' : ''}${isPuppy ? ' + puppy add-on' : ''})`;
     dailyTotal = daySpan > 1 ? `$${(rate * visitCount).toFixed(2)}` : '';
     visitTotal = `$${(rate * totalVisits).toFixed(2)}`;
   }
 
-  const isOngoingClient = d.clientType === 'Ongoing';
-  const specificDateRange = (d.endDate && d.endDate !== d.startDate)
-    ? `${formatDate(d.startDate)} &ndash; ${formatDate(d.endDate)}`
-    : formatDate(d.startDate);
-  const dateRange = isOngoingClient
+  const dateRange = d.clientType === 'Ongoing'
     ? `Ongoing &mdash; schedule based on availability<br><small>Preferred first date: ${formatDate(d.startDate)}</small>`
-    : specificDateRange;
+    : (d.endDate && d.endDate !== d.startDate
+      ? `${formatDate(d.startDate)} &ndash; ${formatDate(d.endDate)}`
+      : formatDate(d.startDate));
 
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -1118,20 +1420,13 @@ function buildContractHtml(d) {
 
   const serviceTypeChecks = `${checkbox(isDropIn)} Drop-in &nbsp;&nbsp; ${checkbox(isOvernight)} Overnight &nbsp;&nbsp; ${checkbox(isDayCare)} Daycare &nbsp;&nbsp; ${checkbox(false)} Other: <span class="blank-line"></span>`;
 
-  // "As agreed on by both parties" only applies to the time field(s) for
-  // whichever service type this booking actually is -- an Ongoing Overnight
-  // client gets it checked on Drop-off/Pick-up but not on Drop-in Time,
-  // and vice versa for an Ongoing Drop-In client.
-  const dropOffPickupAsAgreed = ` &nbsp;&nbsp; ${checkbox(isOngoingClient && (isOvernight || isDayCare))} As agreed on by both parties`;
-  const dropInTimeAsAgreed = ` &nbsp;&nbsp; ${checkbox(isOngoingClient && isDropIn)} As agreed on by both parties`;
-
   const dropOffPickup = (isOvernight || isDayCare)
-    ? `<div class="field"><label>Drop-off Time:</label> ${formatTime(d.startTime)} &nbsp;&nbsp; <label>Pick-up Time:</label> ${formatTime(d.endTime)}${dropOffPickupAsAgreed}</div>`
-    : `<div class="field"><label>Drop-off Time:</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Pick-up Time:</label> <span class="blank-line"></span>${dropOffPickupAsAgreed}</div>`;
+    ? `<div class="field"><label>Drop-off Time:</label> ${formatTime(d.startTime)} &nbsp;&nbsp; <label>Pick-up Time:</label> ${formatTime(d.endTime)}</div>`
+    : `<div class="field"><label>Drop-off Time:</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Pick-up Time:</label> <span class="blank-line"></span></div>`;
 
   const dropInTimeRow = isDropIn
-    ? `<div class="field"><label>Drop-in Time(s):</label> ${formatTimesList(d.startTime)} &nbsp;&nbsp; <label>Length of Drop-in:</label> 30 minutes each${dropInTimeAsAgreed}</div>`
-    : `<div class="field"><label>Drop-in Time(s):</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Length of Drop-in:</label> <span class="blank-line"></span>${dropInTimeAsAgreed}</div>`;
+    ? `<div class="field"><label>Drop-in Time(s):</label> ${formatTimesList(d.startTime)} &nbsp;&nbsp; <label>Length of Drop-in:</label> 30 minutes each</div>`
+    : `<div class="field"><label>Drop-in Time(s):</label> <span class="blank-line"></span> &nbsp;&nbsp; <label>Length of Drop-in:</label> <span class="blank-line"></span></div>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1220,8 +1515,8 @@ function buildContractHtml(d) {
     <div class="field"><label>Emergency Contact Name:</label> ${d.emergencyName || blankLine} &nbsp;&nbsp; <label>Phone:</label> ${d.emergencyPhone || blankLine}</div>
 
     <h3 class="sub-h">Service Preferences</h3>
-    <div class="field">Days Needed: ${checkbox(false)} M &nbsp; ${checkbox(false)} T &nbsp; ${checkbox(false)} W &nbsp; ${checkbox(false)} Th &nbsp; ${checkbox(false)} F &nbsp; ${checkbox(false)} Sa &nbsp; ${checkbox(false)} Su &nbsp; ${checkbox(isOngoingClient)} As agreed on by both parties</div>
-    <div class="field"><label>Dates Needed:</label> ${isOngoingClient ? blankLine : specificDateRange} &nbsp; ${checkbox(isOngoingClient)} As agreed on by both parties</div>
+    <div class="field">Days Needed: ${checkbox(false)} M &nbsp; ${checkbox(false)} T &nbsp; ${checkbox(false)} W &nbsp; ${checkbox(false)} Th &nbsp; ${checkbox(false)} F &nbsp; ${checkbox(false)} Sa &nbsp; ${checkbox(false)} Su</div>
+    <div class="field"><label>Dates Needed:</label> ${dateRange}</div>
     <div class="field">Service Type: ${serviceTypeChecks}</div>
     ${dropOffPickup}
     ${dropInTimeRow}
@@ -1342,56 +1637,58 @@ bookingForm.addEventListener('submit', async (e) => {
   }
 
   let requestDates = [d.startDate];
-  let perDayTimes = null; // drop-in: date -> comma times (per-day or shared)
-  if (DROP_IN_SERVICES.has(d.serviceType)) {
-    if (!ongoing) {
-      const sel = mainCal.getSelection();
-      if (sel.dropInDates.length === 0) {
-        showBookingStatus('Please choose at least one day on the calendar.', 'error');
-        return;
-      }
-      // Drop-in days are an explicit set (can be non-contiguous) -- one booking
-      // row per selected day. Same times for all, or per-day if chosen.
-      requestDates = sel.dropInDates;
-      if (sel.selectedSlots.length === 0) {
-        showBookingStatus('Please choose at least one time for the first day.', 'error');
-        return;
-      }
-      if (requestDates.some((dt, i) => sel.effTimes(dt, i).length === 0)) {
-        showBookingStatus('Please pick at least one open time for each day.', 'error');
-        return;
-      }
-      perDayTimes = {};
-      requestDates.forEach((dt, i) => { perDayTimes[dt] = [...sel.effTimes(dt, i)].sort().join(','); });
-      d.startTime = [...new Set(requestDates.flatMap((dt, i) => sel.effTimes(dt, i)))].sort().join(',');
-      d.startDate = requestDates[0];
-    } else {
-      // Ongoing client -- no fixed schedule yet.
-      d.startTime = '';
+  // For a multi-date drop-in, each date carries its own times (perDayTimes)
+  // and the rows are tied by a shared group_id.
+  let perDayTimes = null;
+  let groupId = null;
+  if (ongoing) {
+    d.endDate = '';
+    d.startTime = '';
+  } else if (DROP_IN_SERVICES.has(d.serviceType)) {
+    if (!dropInPlan.length) {
+      showBookingStatus('Please tap at least one day on the calendar.', 'error');
+      return;
     }
+    // A day with its "same times as the first day" toggle on inherits the
+    // first day's times; otherwise it uses its own.
+    if (dropInPlan.some((day, i) => effectiveTimes(day, i).length === 0)) {
+      showBookingStatus('Please pick at least one time for each day you selected.', 'error');
+      return;
+    }
+    perDayTimes = {};
+    dropInPlan.forEach((day, i) => { perDayTimes[day.date] = [...effectiveTimes(day, i)].sort().join(','); });
+    requestDates = dropInPlan.map((p) => p.date);
+    d.startDate = requestDates[0];
     d.endDate = '';
-  } else if (ongoing && (!d.endDate || d.endDate === d.startDate)) {
+    d.startTime = [...new Set(dropInPlan.flatMap((day, i) => effectiveTimes(day, i)))].sort().join(',');
+    if (requestDates.length > 1) groupId = genGroupId();
+  } else if (d.serviceType === 'Day Care') {
+    // Day Care: one booking per chosen day, each with the same drop-off /
+    // pick-up time, tied by a shared group_id when there's more than one.
+    if (!dayCarePlan.length) {
+      showBookingStatus('Please tap at least one day on the calendar.', 'error');
+      return;
+    }
+    requestDates = [...dayCarePlan].sort();
+    d.startDate = requestDates[0];
     d.endDate = '';
+    if (requestDates.length > 1) groupId = genGroupId();
   }
   const dateResults = [];
   let networkFailed = false;
-  // The bookings schema has no concept of a non-contiguous date set on one
-  // row, so a multi-date request still creates one row per date -- but they
-  // all share this groupId so the admin UI can show/approve them as one
-  // request instead of N separate ones.
-  const groupId = requestDates.length > 1 ? `grp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` : null;
 
   // Reserve the request(s) with the booking system first — for overnight/day
   // care this checks the dates are still available before we proceed.
   try {
     for (const requestDate of requestDates) {
       const body = { ...d, startDate: requestDate };
+      // Each drop-in day carries its own time(s); the rows share a group_id.
+      if (perDayTimes) body.startTime = perDayTimes[requestDate];
+      if (groupId) body.groupId = groupId;
       // A multi-date request creates one booking row per date, but should
       // only notify Misti once (see notify-multi call below), not once per
       // date -- suppress the server's automatic per-booking email here.
       if (requestDates.length > 1) body.suppressEmail = true;
-      if (groupId) body.groupId = groupId;
-      if (perDayTimes) body.startTime = perDayTimes[requestDate];
       const res = await fetch(`${BOOKING_API}/api/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1426,7 +1723,9 @@ bookingForm.addEventListener('submit', async (e) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               ownerName: d.ownerName, ownerPhone: d.ownerPhone, ownerEmail: d.ownerEmail,
-              serviceType: d.serviceType, petInfo: d.petInfo, startTime: d.startTime,
+              serviceType: d.serviceType, petInfo: d.petInfo,
+              // Per-day drop-ins differ by day, so omit a single time line.
+              startTime: perDayTimes ? '' : d.startTime,
               dates: successDates,
             }),
           });
@@ -1436,7 +1735,21 @@ bookingForm.addEventListener('submit', async (e) => {
       }
     }
 
-    mainCal.reset();
+    renderCalendar();
+    if (DROP_IN_SERVICES.has(d.serviceType)) {
+      dropInPlan = [];
+      dropInSameTimes = true;
+      dropInSharedTimes = [];
+      startDateInput.value = '';
+      endDateInput.value = '';
+      renderDropInTimes();
+      updateCalendarTimePanel();
+    } else if (d.serviceType === 'Day Care') {
+      dayCarePlan = [];
+      startDateInput.value = '';
+      endDateInput.value = '';
+      updateCalendarTimePanel();
+    }
   } catch (err) {
     // The booking system itself never confirmed the request (network error,
     // CORS rejection, etc.) -- nothing was saved server-side, so this must
@@ -1660,39 +1973,25 @@ const rebookEndDateInput = document.getElementById('rebookEndDate');
 const rebookDropinSlots = document.getElementById('rebookDropinSlots');
 const rebookStartTimeInput = document.getElementById('rebookStartTime');
 const rebookEndTimeInput = document.getElementById('rebookEndTime');
+// Same 7:00 AM-9:00 PM, 30-min options as the main booking form -- a plain
+// <input type="time"> let a stray scroll/click land on something like
+// "8:08 AM" for an overnight drop-off, which is exactly the kind of bad
+// data this avoids.
+populateTimeOptions(rebookStartTimeInput);
+populateTimeOptions(rebookEndTimeInput);
 const rebookPresetTimesGroup = document.getElementById('rebookPresetTimesGroup');
 const rebookPresetTimes = document.getElementById('rebookPresetTimes');
 
 // Holds the signed-in client's portal data (profile, sections, bookings).
 // Declared here (rather than down by the rest of the portal-rendering code)
-// because the rebookCal instance below is created at load time, before sign-in,
-// and its slotParams hook reads currentPortalData -- a `let` declared later
-// would still be in its temporal dead zone at that point and throw.
+// because updateRebookFieldVisibility() below runs once unconditionally at
+// load time, before sign-in -- a `let` declared later would still be in
+// its temporal dead zone at that point and throw.
 let currentPortalData = null;
 
-// The returning-client "Book" tab uses the same calendar as new clients.
-// currentPortalData (declared above) supplies the clientId so the slot lookup
-// excludes this client's own existing visits.
-const rebookCal = createBookingCalendar({
-  serviceTypeSelect: rebookServiceType,
-  startDateInput: rebookStartDateInput,
-  endDateInput: rebookEndDateInput,
-  startTimeInput: rebookStartTimeInput,
-  endTimeInput: rebookEndTimeInput,
-  startTimeGroup: document.getElementById('rebookStartTimeGroup'),
-  startTimeLabel: document.getElementById('rebookStartTimeLabel'),
-  endTimeGroup: document.getElementById('rebookEndTimeGroup'),
-  dropinSlotsGroup: document.getElementById('rebookDropinSlotsGroup'),
-  dropinSlots: rebookDropinSlots,
-  calendarTimePanel: document.getElementById('rebookCalendarTimePanel'),
-  calendarTimePanelSummary: document.getElementById('rebookCalendarTimePanelSummary'),
-  calEl: document.getElementById('rebookAvailabilityCalendar'),
-  monthLabel: document.getElementById('rebookCalMonthLabel'),
-  prevBtn: document.getElementById('rebookCalPrev'),
-  nextBtn: document.getElementById('rebookCalNext'),
-  slotParams: () => currentPortalData?.clientId ? `&clientId=${encodeURIComponent(currentPortalData.clientId)}` : '',
-  onServiceChange: () => renderRebookPresetTimes(),
-});
+// Same idea as the main booking form's slot picker (selectedSlots above) --
+// a drop-in visit can cover more than one check-in on the same day.
+let selectedRebookSlots = new Set();
 
 // Which pet(s) this rebook request is for -- a multi-pet household can pick
 // either pet alone or both together. Defaults to all pets (the whole
@@ -1701,8 +2000,9 @@ let selectedRebookPets = new Set();
 
 // Some clients (set by Misti via the admin client directory's "Drop-In
 // Presets" tab) have a handful of usual drop-in times -- show those as
-// one-tap quick-select buttons that toggle the calendar's first-day times,
-// so picking them doesn't mean hunting through 7am-9pm every time.
+// one-tap quick-select buttons above the full slot grid so picking them
+// doesn't mean hunting through 7am-9pm every time. Purely a convenience
+// shortcut into the same selectedRebookSlots set the real grid uses.
 function renderRebookPresetTimes() {
   const presetTimes = String(currentPortalData?.sections?.['Drop-In Presets']?.times || '')
     .split(',').map((t) => t.trim()).filter(Boolean);
@@ -1716,15 +2016,296 @@ function renderRebookPresetTimes() {
   presetTimes.forEach((time) => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = `slot-btn ${rebookCal.hasSlot(time) ? 'slot-selected' : 'slot-available'}`;
+    btn.className = `slot-btn ${selectedRebookSlots.has(time) ? 'slot-selected' : 'slot-available'}`;
     btn.textContent = formatTime(time);
     btn.addEventListener('click', () => {
-      rebookCal.toggleSlot(time);
+      if (selectedRebookSlots.has(time)) selectedRebookSlots.delete(time);
+      else selectedRebookSlots.add(time);
       renderRebookPresetTimes();
+      renderRebookTimeSlots();
     });
     rebookPresetTimes.appendChild(btn);
   });
 }
+
+async function renderRebookTimeSlots() {
+  const date = rebookStartDateInput.value;
+  if (!date) {
+    rebookDropinSlots.innerHTML = '<p class="slots-loading">Pick a date above to see open times.</p>';
+    return;
+  }
+  rebookDropinSlots.innerHTML = '<p class="slots-loading">Loading times…</p>';
+  try {
+    const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${date}&clientId=${encodeURIComponent(currentPortalData?.clientId || '')}`);
+    if (!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    rebookDropinSlots.innerHTML = '';
+    (data.slots || []).forEach(s => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `slot-btn ${s.available ? 'slot-available' : 'slot-booked'}`;
+      btn.textContent = formatTime(s.time);
+      btn.disabled = !s.available;
+      if (selectedRebookSlots.has(s.time)) btn.classList.add('slot-selected');
+      btn.addEventListener('click', () => {
+        if (selectedRebookSlots.has(s.time)) {
+          selectedRebookSlots.delete(s.time);
+          btn.classList.remove('slot-selected');
+        } else {
+          selectedRebookSlots.add(s.time);
+          btn.classList.add('slot-selected');
+        }
+      });
+      rebookDropinSlots.appendChild(btn);
+    });
+  } catch {
+    rebookDropinSlots.innerHTML = '<p class="slots-error">Could not load times — please try again.</p>';
+  }
+}
+
+// Returning-client version of the multi-day drop-in plan (see dropInPlan).
+let rebookPlan = []; // [{ date, times: [] }]
+let rebookSameTimes = true;
+let rebookSharedTimes = [];
+const addRebookDayBtn = document.getElementById('addRebookDay');
+const rebookPlanList = document.getElementById('rebookPlanList');
+const rebookDayCareList = document.getElementById('rebookDayCareList');
+
+// The per-day-grid model adds a day when a date is picked and shows each day's
+// own time grid, so the old "add this day" button + summary list aren't used.
+if (addRebookDayBtn) addRebookDayBtn.style.display = 'none';
+if (rebookPlanList) rebookPlanList.style.display = 'none';
+
+// Day Care (rebook): rebookPlan holds plain { date } entries — no per-visit
+// times — rendered as a simple removable list.
+function renderRebookDayCareList() {
+  if (!rebookDayCareList) return;
+  if (!rebookPlan.length) {
+    rebookDayCareList.innerHTML =
+      '<p class="slots-loading">Pick a date above to add a day. Pick another date to add more.</p>';
+    return;
+  }
+  rebookDayCareList.innerHTML = '';
+  rebookPlan.forEach((day) => {
+    const row = document.createElement('div');
+    row.className = 'dropin-plan__row';
+    const label = document.createElement('span');
+    label.textContent = dayHeading(day.date);
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'dropin-plan__remove';
+    rm.textContent = 'Remove';
+    rm.addEventListener('click', () => {
+      rebookPlan = rebookPlan.filter((p) => p.date !== day.date);
+      renderRebookDayCareList();
+    });
+    row.appendChild(label);
+    row.appendChild(rm);
+    rebookDayCareList.appendChild(row);
+  });
+}
+
+// A client's "usual" drop-in times (set by Misti) pre-fill each newly added
+// day — they're then pruned to whatever's actually open that day.
+function getRebookPresetTimes() {
+  return String(currentPortalData?.sections?.['Drop-In Presets']?.times || '')
+    .split(',').map((t) => t.trim()).filter(Boolean);
+}
+
+function removeRebookDay(date) {
+  rebookPlan = rebookPlan.filter((p) => p.date !== date);
+  renderRebookTimes();
+}
+
+// One section per selected day (same per-day model as the public form): the
+// first day picks times; each later day has a "use same drop-in times as
+// <first day>" toggle (on by default) and only shows its own chips when off.
+function renderRebookTimes() {
+  if (!rebookPlan.length) {
+    rebookDropinSlots.innerHTML =
+      '<p class="slots-loading">Pick a date above to add a day, then choose its time(s). Pick another date to add more days.</p>';
+    return;
+  }
+  rebookDropinSlots.innerHTML = '';
+  const firstLabel = shortDay(rebookPlan[0].date);
+  rebookPlan.forEach((day, i) => {
+    const section = document.createElement('div');
+    section.className = 'dropin-day';
+
+    const head = document.createElement('div');
+    head.className = 'dropin-day__head';
+    const title = document.createElement('span');
+    title.className = 'dropin-day__date';
+    title.textContent = dayHeading(day.date);
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'dropin-plan__remove';
+    rm.textContent = 'Remove';
+    rm.addEventListener('click', () => removeRebookDay(day.date));
+    head.appendChild(title);
+    head.appendChild(rm);
+    section.appendChild(head);
+
+    const sub = document.createElement('p');
+    sub.className = 'dropin-day__sub';
+    sub.textContent = 'Add one or more drop-in times';
+    section.appendChild(sub);
+
+    if (i > 0) section.appendChild(buildInheritToggle(day, firstLabel, () => renderRebookTimes()));
+
+    if (i === 0 || day.inherit === false) {
+      const grid = document.createElement('div');
+      grid.className = 'dropin-slots dropin-day__slots';
+      grid.innerHTML = '<p class="slots-loading">Loading times…</p>';
+      section.appendChild(grid);
+      loadRebookDaySlots(day, grid);
+    }
+    rebookDropinSlots.appendChild(section);
+  });
+}
+
+async function loadRebookDaySlots(day, grid) {
+  try {
+    const res = await fetch(`${BOOKING_API}/api/availability/slots?date=${day.date}&clientId=${encodeURIComponent(currentPortalData?.clientId || '')}`);
+    if (!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    const available = new Set((data.slots || []).filter((s) => s.available).map((s) => s.time));
+    // Drop any preset-prefilled times that aren't actually open this day.
+    day.times = day.times.filter((t) => available.has(t));
+    grid.innerHTML = '';
+    (data.slots || []).forEach((s) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `slot-btn ${s.available ? 'slot-available' : 'slot-booked'}`;
+      btn.textContent = formatTime(s.time);
+      btn.disabled = !s.available;
+      if (day.times.includes(s.time)) btn.classList.add('slot-selected');
+      btn.addEventListener('click', () => {
+        const i = day.times.indexOf(s.time);
+        if (i >= 0) {
+          day.times.splice(i, 1);
+          btn.classList.remove('slot-selected');
+        } else {
+          day.times.push(s.time);
+          btn.classList.add('slot-selected');
+        }
+      });
+      grid.appendChild(btn);
+    });
+  } catch {
+    grid.innerHTML = '<p class="slots-error">Could not load times — please try again.</p>';
+  }
+}
+
+// Same-times mode: a slot is offered only if open on EVERY selected day.
+async function loadSharedRebookSlots(grid) {
+  try {
+    const cid = encodeURIComponent(currentPortalData?.clientId || '');
+    const datasets = await Promise.all(
+      rebookPlan.map((p) =>
+        fetch(`${BOOKING_API}/api/availability/slots?date=${p.date}&clientId=${cid}`).then((r) => {
+          if (!r.ok) throw new Error('bad');
+          return r.json();
+        })
+      )
+    );
+    const all = (datasets[0]?.slots || []).map((s) => s.time);
+    const avail = new Set(
+      all.filter((t) =>
+        datasets.every((d) => (d.slots || []).some((s) => s.time === t && s.available))
+      )
+    );
+    rebookSharedTimes = rebookSharedTimes.filter((t) => avail.has(t));
+    renderSlotGrid(grid, all, avail, rebookSharedTimes, null);
+  } catch {
+    grid.innerHTML = '<p class="slots-error">Could not load times — please try again.</p>';
+  }
+}
+
+function updateRebookFieldVisibility() {
+  const type = rebookServiceType.value;
+  document.querySelectorAll('[data-rebook-for]').forEach(el => {
+    el.hidden = !el.dataset.rebookFor.split(',').includes(type);
+  });
+  rebookPlan = [];
+  rebookSameTimes = true;
+  rebookSharedTimes = [];
+  if (type === 'Drop-In Visit') {
+    renderRebookTimes();
+    // The date field is an "add a day" picker now, so hide the single preset
+    // row and the end-date range.
+    rebookPresetTimesGroup.hidden = true;
+    rebookPresetTimes.innerHTML = '';
+    rebookEndDateInput.closest('.form-group').hidden = true;
+  } else if (type === 'Day Care') {
+    // Day Care is also an "add a day" picker (multiple separate days, one
+    // drop-off/pick-up time for all) — no end-date range.
+    rebookEndDateInput.value = '';
+    rebookEndDateInput.closest('.form-group').hidden = true;
+    renderRebookDayCareList();
+  } else {
+    selectedRebookSlots.clear();
+    rebookDropinSlots.innerHTML = '';
+    renderRebookPresetTimes();
+  }
+}
+rebookServiceType.addEventListener('change', updateRebookFieldVisibility);
+rebookStartDateInput.addEventListener('change', () => {
+  if (!isPlausibleDateValue(rebookStartDateInput.value)) return;
+  if (rebookServiceType.value === 'Drop-In Visit') {
+    // Picking a date adds that day (pre-filled with the client's usual times).
+    // The field keeps the last-picked date (it's a required field); pick a
+    // different date to add another day.
+    const date = rebookStartDateInput.value;
+    if (date && !rebookPlan.some((p) => p.date === date)) {
+      const presets = getRebookPresetTimes();
+      upsertPlanDay(rebookPlan, date, [...presets]);
+      // New days inherit the first day's times by default (toggle on).
+      const added = rebookPlan.find((p) => p.date === date);
+      if (added && added.inherit === undefined) added.inherit = true;
+      renderRebookTimes();
+    }
+    showRebookStatus('', '');
+    return;
+  }
+  if (rebookServiceType.value === 'Day Care') {
+    // Picking a date adds that day; pick another date to add more.
+    const date = rebookStartDateInput.value;
+    if (date && !rebookPlan.some((p) => p.date === date)) {
+      rebookPlan.push({ date });
+      rebookPlan.sort((a, b) => a.date.localeCompare(b.date));
+      renderRebookDayCareList();
+    }
+    showRebookStatus('', '');
+    return;
+  }
+  // End date can't be before the (possibly new) start date -- also nudges
+  // native date pickers to open showing the start date's month.
+  rebookEndDateInput.min = rebookStartDateInput.value || '';
+  if (rebookEndDateInput.value && rebookEndDateInput.value < rebookStartDateInput.value) {
+    rebookEndDateInput.value = '';
+  }
+});
+// A native <input type="date">'s `change` event can fire mid-typing once a
+// segment looks "complete" -- e.g. typing just the first digit of a year
+// briefly forms a zero-padded date like 0002-07-01, which is technically a
+// valid complete date and is *always* before the start date. Without this
+// guard, that fires the alert and wipes the field before the user finishes
+// typing the year they actually meant. Treat a year far from "now" as still
+// mid-edit rather than a deliberate value.
+function isPlausibleDateValue(value) {
+  if (!value) return false;
+  const year = Number(value.slice(0, 4));
+  return year >= new Date().getFullYear() - 1;
+}
+rebookEndDateInput.addEventListener('change', () => {
+  if (!isPlausibleDateValue(rebookEndDateInput.value)) return;
+  if (rebookStartDateInput.value && rebookEndDateInput.value < rebookStartDateInput.value) {
+    alert('End date cannot be before the start date.');
+    rebookEndDateInput.value = '';
+  }
+});
+updateRebookFieldVisibility();
 
 function showRebookStatus(message, type) {
   rebookStatus.textContent = message;
@@ -1748,40 +2329,40 @@ rebookForm.addEventListener('submit', async (e) => {
   if (!rebookPetGroup.hidden && selectedRebookPets.size < allPetNames.length) {
     body.petNames = [...selectedRebookPets].join(',');
   }
-  const sel = rebookCal.getSelection();
-  let requestDates = [sel.startDate];
-  let perDayTimes = null; // drop-in: date -> comma times (per-day or shared)
-  if (sel.serviceType === 'Drop-In Visit') {
-    if (sel.dropInDates.length === 0) {
-      showRebookStatus('Please choose at least one day on the calendar.', 'error');
+  let requestDates = [body.startDate];
+  let perDayTimes = null;
+  let groupId = null;
+  if (body.serviceType === 'Drop-In Visit') {
+    if (!rebookPlan.length) {
+      showRebookStatus('Please pick a date to add at least one day.', 'error');
       return;
     }
-    if (sel.selectedSlots.length === 0) {
-      showRebookStatus('Please choose at least one time for the first day.', 'error');
-      return;
-    }
-    // One rebook request per selected day; same times for all, or per-day.
-    requestDates = sel.dropInDates;
-    if (requestDates.some((dt, i) => sel.effTimes(dt, i).length === 0)) {
-      showRebookStatus('Please pick at least one open time for each day.', 'error');
+    // A day with its "same times as the first day" toggle on inherits the
+    // first day's times; otherwise it uses its own.
+    if (rebookPlan.some((day, i) => effTimesFor(rebookPlan, day, i).length === 0)) {
+      showRebookStatus('Please pick at least one time for each day you added.', 'error');
       return;
     }
     perDayTimes = {};
-    requestDates.forEach((dt, i) => { perDayTimes[dt] = [...sel.effTimes(dt, i)].sort().join(','); });
-    body.startTime = [...new Set(requestDates.flatMap((dt, i) => sel.effTimes(dt, i)))].sort().join(',');
+    rebookPlan.forEach((day, i) => { perDayTimes[day.date] = [...effTimesFor(rebookPlan, day, i)].sort().join(','); });
+    requestDates = rebookPlan.map((p) => p.date);
     body.startDate = requestDates[0];
     body.endDate = '';
-  } else if (!sel.startDate) {
-    showRebookStatus('Please choose a date on the calendar.', 'error');
-    return;
+    body.startTime = [...new Set(rebookPlan.flatMap((day, i) => effTimesFor(rebookPlan, day, i)))].sort().join(',');
+    if (requestDates.length > 1) groupId = genGroupId();
+  } else if (body.serviceType === 'Day Care') {
+    // Day Care: one booking per chosen day, same drop-off/pick-up time for all.
+    if (!rebookPlan.length) {
+      showRebookStatus('Please pick a date to add at least one day.', 'error');
+      return;
+    }
+    requestDates = rebookPlan.map((p) => p.date);
+    body.startDate = requestDates[0];
+    body.endDate = '';
+    if (requestDates.length > 1) groupId = genGroupId();
   }
 
   showRebookStatus('Sending your request...', '');
-  // The bookings schema has no concept of a non-contiguous date set on one
-  // row, so a multi-date request still creates one row per date -- but they
-  // all share this groupId so the admin UI can show/approve them as one
-  // request instead of N separate ones.
-  const groupId = requestDates.length > 1 ? `grp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` : null;
   try {
     const results = [];
     for (const requestDate of requestDates) {
@@ -1789,9 +2370,9 @@ rebookForm.addEventListener('submit', async (e) => {
       // only notify Misti once (see notify-multi call below), not once per
       // date -- suppress the server's automatic per-booking email here.
       const reqBody = { ...body, startDate: requestDate };
-      if (requestDates.length > 1) reqBody.suppressEmail = true;
-      if (groupId) reqBody.groupId = groupId;
       if (perDayTimes) reqBody.startTime = perDayTimes[requestDate];
+      if (groupId) reqBody.groupId = groupId;
+      if (requestDates.length > 1) reqBody.suppressEmail = true;
       const res = await fetch(`${BOOKING_API}/api/client-portal/${currentPortalData.clientId}/rebook`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1810,7 +2391,8 @@ rebookForm.addEventListener('submit', async (e) => {
             body: JSON.stringify({
               ownerName: currentPortalData.ownerName, ownerPhone: currentPortalData.ownerPhone,
               ownerEmail: currentPortalData.ownerEmail, serviceType: body.serviceType,
-              petInfo: currentPortalData.petInfo, startTime: body.startTime,
+              petInfo: currentPortalData.petInfo,
+              startTime: perDayTimes ? '' : body.startTime,
               dates: successDates,
             }),
           });
@@ -1831,9 +2413,7 @@ rebookForm.addEventListener('submit', async (e) => {
       failed.length ? 'error' : 'success'
     );
     rebookForm.reset();
-    rebookCal.reset();
-    rebookCal.updateTimeFields();
-    renderRebookPresetTimes();
+    updateRebookFieldVisibility();
     // Refresh the My Bookings tab so the new request shows up immediately.
     // Some paper-contract clients have no email on file -- fall back to the
     // same pet-name lookup that got them into this portal in the first place.
@@ -1964,18 +2544,6 @@ function isPetProfileSection(sectionTitle) {
   return /dog profile|pet profile|cat profile/i.test(sectionTitle);
 }
 
-// "Dog Profile - Lenny" -> "Lenny"; "Pet Profile" -> "Pet".
-function petNameFromSection(sectionTitle) {
-  const m = String(sectionTitle || '').match(/-\s*(.+)$/);
-  if (m) return m[1].trim();
-  return String(sectionTitle || '').replace(/profile/i, '').trim();
-}
-
-function petProfileSectionTitles() {
-  const sections = currentPortalData?.sections || {};
-  return Object.keys(sections).filter(isPetProfileSection);
-}
-
 function updateWelcomeAvatar() {
   const data = currentPortalData;
   const avatar = data?.profilePhoto || data?.photos?.[0];
@@ -2051,16 +2619,7 @@ async function removeProfilePic() {
 function renderPhotosHtml() {
   const data = currentPortalData;
   if (!data.clientId) return '';
-  const allPhotos = data.photos || [];
-  const photoPets = data.photoPets || {};
-  const petName = petNameFromSection(activeOverviewSection);
-  const singlePet = petProfileSectionTitles().length <= 1;
-  // Show only this pet's photos; untagged photos show for single-pet households.
-  const photos = allPhotos.filter((p) => {
-    const assigned = photoPets[p];
-    if (assigned) return assigned === petName;
-    return singlePet;
-  });
+  const photos = data.photos || [];
   const limit = data.photoLimit || 2;
   const photosHtml = photos.map((p) => `
     <div class="portal-photo">
@@ -2068,12 +2627,12 @@ function renderPhotosHtml() {
       <button type="button" class="portal-photo-remove" data-path="${escapeAttr(p)}">&times;</button>
     </div>
   `).join('');
-  const addHtml = allPhotos.length < limit
+  const addHtml = photos.length < limit
     ? `<label class="portal-photo-add">+<input type="file" accept="image/*" multiple hidden id="portalPhotoInput" /></label>`
     : '';
   return `
     <div class="portal-section">
-      <h4>${petName ? escapeAttr(petName) + "&rsquo;s Photos" : 'Pet Photos'}</h4>
+      <h4>Pet Photos</h4>
       <div class="portal-photos">${photosHtml}${addHtml}</div>
       <p id="portalPhotoStatus" class="booking-status" hidden></p>
     </div>
@@ -2084,10 +2643,6 @@ async function uploadClientPhotos(files) {
   if (!files || !files.length || !currentPortalData?.clientId) return;
   const formData = new FormData();
   for (const file of files) formData.append('photos', file);
-  // Tag the upload with the pet whose profile the client is currently on, so
-  // it lands on that pet's profile rather than a shared bucket.
-  const pet = isPetProfileSection(activeOverviewSection) ? petNameFromSection(activeOverviewSection) : '';
-  if (pet) formData.append('pet', pet);
   const status = document.getElementById('portalPhotoStatus');
   if (status) { status.textContent = 'Uploading...'; status.hidden = false; }
   try {
@@ -2098,7 +2653,6 @@ async function uploadClientPhotos(files) {
     if (!res.ok) throw new Error('bad response');
     const result = await res.json();
     currentPortalData.photos = result.photos;
-    if (result.photoPets) currentPortalData.photoPets = result.photoPets;
     if (result.limit) currentPortalData.photoLimit = result.limit;
     renderOverviewBody();
   } catch {
@@ -2156,8 +2710,7 @@ function renderPortalOverview(data) {
   updateWelcomeAvatar();
   renderOverviewBody();
   renderRebookPetOptions();
-  rebookCal.reset();
-  rebookCal.updateTimeFields();
+  selectedRebookSlots.clear();
   renderRebookPresetTimes();
 }
 
@@ -2227,144 +2780,39 @@ function cancellationPolicyInfo(startDateStr) {
 
 const CANCELLABLE_STATUSES = new Set(['pending', 'approved']);
 
-function nextCalendarDay(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
-
-// "Drop-off/Pick-up" wording only makes sense for Overnight/Day Care (you
-// drop your pet off, pick them up later) -- a Drop-In Visit is a short visit
-// at the home, so it's just listed as a plain time (or times).
-function timesNoteHtml(b) {
-  if (!b.start_time) return '';
-  const isDropIn = b.service_type === 'Drop-In Visit';
-  const text = (!isDropIn && b.end_time)
-    ? 'Drop-off ' + formatTime(b.start_time) + ' / Pick-up ' + formatTime(b.end_time)
-    : formatTimesList(b.start_time);
-  return `<br /><small>${text}</small>`;
-}
-
-function bookingCardHtml(group) {
-  const sorted = group.slice().sort((a, c) => a.start_date.localeCompare(c.start_date));
-  const first = sorted[0];
-  const isMulti = sorted.length > 1;
-  const dates = isMulti
-    ? sorted.map((b) => (b.end_date && b.end_date !== b.start_date ? `${formatDate(b.start_date)} – ${formatDate(b.end_date)}` : formatDate(b.start_date))).join(', ')
-    : (first.end_date && first.end_date !== first.start_date ? `${formatDate(first.start_date)} – ${formatDate(first.end_date)}` : formatDate(first.start_date));
-  const multiBadge = isMulti ? ` <span class="portal-status">${sorted.length} dates</span>` : '';
-  const canModify = CANCELLABLE_STATUSES.has(first.status) && first.source !== 'calendar' && !isMulti;
-  const hasRange = first.end_date && first.end_date !== first.start_date;
-  const minDate = new Date().toISOString().slice(0, 10);
-  const cancelUi = canModify ? `
+function bookingCardHtml(b) {
+  const dates = b.end_date && b.end_date !== b.start_date
+    ? `${formatDate(b.start_date)} – ${formatDate(b.end_date)}`
+    : formatDate(b.start_date);
+  const cancelUi = CANCELLABLE_STATUSES.has(b.status) ? `
     <div class="portal-cancel-actions">
-      <button type="button" class="btn btn-outline btn-change-dates" data-booking-id="${first.id}">Change Dates</button>
-      <button type="button" class="btn btn-outline btn-cancel-reservation" data-booking-id="${first.id}" data-start-date="${first.start_date}">Cancel Reservation</button>
+      <button type="button" class="btn btn-outline btn-cancel-reservation" data-booking-id="${b.id}" data-start-date="${b.start_date}">Cancel Reservation</button>
     </div>
-    <div class="portal-change-form" data-booking-id="${first.id}" hidden>
-      <p class="portal-change-title">Request ${hasRange ? 'new dates' : 'a new date'}:</p>
-      <label class="portal-change-field">${hasRange ? 'Start date' : 'New date'}<input type="date" class="change-start-date" value="${first.start_date}" min="${minDate}" /></label>
-      ${hasRange ? `<label class="portal-change-field">End date<input type="date" class="change-end-date" value="${first.end_date}" min="${minDate}" /></label>` : ''}
-      <p class="change-status booking-status" hidden></p>
-      <div class="portal-change-actions">
-        <button type="button" class="btn btn-outline btn-change-cancel">Never mind</button>
-        <button type="button" class="btn btn-primary btn-change-submit" data-booking-id="${first.id}">Send request to Misti</button>
-      </div>
-    </div>
-    <div class="portal-cancel-confirm" data-booking-id="${first.id}" hidden></div>
+    <div class="portal-cancel-confirm" data-booking-id="${b.id}" hidden></div>
   ` : '';
   return `
     <div class="portal-booking-card">
       <div class="portal-booking-row">
-        <span><strong>${first.service_type}</strong>${multiBadge}<br />${dates}${timesNoteHtml(first)}</span>
-        <span class="portal-status portal-status-${first.status}">${first.status}</span>
+        <span><strong>${b.service_type}</strong><br />${dates}</span>
+        <span class="portal-status portal-status-${b.status}">${b.status}</span>
       </div>
       ${cancelUi}
     </div>
   `;
 }
 
-// A recurring drop-in client otherwise shows one near-identical card per
-// individual visit, real bookings and calendar-only visits alike -- group
-// real booking rows by matching service/status/times (handles a multi-date
-// request submitted as several separate rows), and collapse calendar-only
-// visits by day then by consecutive same-visit-count days into a range,
-// mirroring the same idea already used in the admin dashboard.
-function groupPortalBookings(bookings) {
-  const real = bookings.filter((b) => b.source !== 'calendar');
-  const cal = bookings.filter((b) => b.source === 'calendar');
-  const groups = [];
-
-  const realKey = (b) => [b.service_type, b.status, b.start_time || '', b.end_time || ''].join('|');
-  const seenRealKeys = new Set();
-  for (const b of real) {
-    const key = realKey(b);
-    if (seenRealKeys.has(key)) continue;
-    seenRealKeys.add(key);
-    groups.push(real.filter((x) => realKey(x) === key));
-  }
-
-  const byDate = new Map();
-  for (const b of cal) {
-    const key = `${b.start_date}|${b.service_type}|${b.status}`;
-    if (!byDate.has(key)) byDate.set(key, { start_date: b.start_date, end_date: b.start_date, service_type: b.service_type, status: b.status, visits: [] });
-    byDate.get(key).visits.push(b);
-  }
-  const days = [...byDate.values()].sort((a, c) => a.start_date.localeCompare(c.start_date));
-  for (const day of days) day.visits.sort((a, c) => (a.start_time || '').localeCompare(c.start_time || ''));
-
-  const ranges = [];
-  for (const day of days) {
-    const prev = ranges[ranges.length - 1];
-    if (prev && nextCalendarDay(prev.end_date) === day.start_date && prev.visits.length / prev.dayCount === day.visits.length
-        && prev.service_type === day.service_type && prev.status === day.status) {
-      prev.end_date = day.start_date;
-      prev.dayCount += 1;
-      prev.visits.push(...day.visits);
-    } else {
-      ranges.push({ ...day, dayCount: 1, visits: [...day.visits] });
-    }
-  }
-  for (const r of ranges) {
-    // Represent the whole range as one synthetic booking per date in it, so
-    // bookingCardHtml's existing multi-date listing logic just works -- one
-    // representative entry per day carrying that day's combined times.
-    const visitsPerDay = r.visits.length / r.dayCount;
-    const byStartDate = new Map();
-    for (const v of r.visits) {
-      if (!byStartDate.has(v.start_date)) byStartDate.set(v.start_date, []);
-      byStartDate.get(v.start_date).push(v);
-    }
-    const synthetic = [...byStartDate.entries()].map(([start_date, visits]) => ({
-      ...visits[0],
-      start_date,
-      end_date: visits[0].end_date,
-      start_time: visits.map((v) => v.start_time).filter(Boolean).join(','),
-      end_time: visitsPerDay > 1 ? null : visits[0].end_time,
-      source: 'calendar',
-    }));
-    groups.push(synthetic);
-  }
-
-  return groups;
-}
-
 // Server already returns every booking on file for the client (no date or
-// status filter) -- this groups near-duplicate visits (see
-// groupPortalBookings()) and separates upcoming/in-progress from history.
+// status filter) -- this just groups them so upcoming/in-progress visits
+// are clearly separated from history instead of one undifferentiated list.
 function renderPortalBookings(bookings) {
   if (!bookings || !bookings.length) {
     portalBookingsBody.innerHTML = '<p>No bookings yet.</p>';
     return;
   }
-  const groupedBookings = groupPortalBookings(bookings);
-  const groupLatestDate = (g) => g.reduce((max, b) => (b.start_date > max ? b.start_date : max), g[0].start_date);
-  const groupEarliestDate = (g) => g.reduce((min, b) => (b.start_date < min ? b.start_date : min), g[0].start_date);
-
   const today = new Date().toISOString().slice(0, 10);
-  const isUpcoming = (g) => groupLatestDate(g) >= today;
-  const upcoming = groupedBookings.filter(isUpcoming).sort((a, b) => groupEarliestDate(a).localeCompare(groupEarliestDate(b)));
-  const past = groupedBookings.filter((g) => !isUpcoming(g)).sort((a, b) => groupEarliestDate(b).localeCompare(groupEarliestDate(a)));
+  const isUpcoming = (b) => (b.end_date || b.start_date) >= today;
+  const upcoming = bookings.filter(isUpcoming).sort((a, b) => a.start_date.localeCompare(b.start_date));
+  const past = bookings.filter((b) => !isUpcoming(b)).sort((a, b) => b.start_date.localeCompare(a.start_date));
 
   let html = '';
   if (upcoming.length) {
@@ -2397,61 +2845,10 @@ portalBookingsBody.addEventListener('click', async (e) => {
   const keepBtn = e.target.closest('.btn-keep-reservation');
   if (keepBtn) {
     const confirmPanel = keepBtn.closest('.portal-cancel-confirm');
+    const cancelActions = confirmPanel.previousElementSibling;
     confirmPanel.hidden = true;
     confirmPanel.innerHTML = '';
-    const card = keepBtn.closest('.portal-booking-card');
-    const reCancelBtn = card && card.querySelector('.btn-cancel-reservation');
-    if (reCancelBtn) reCancelBtn.hidden = false;
-    return;
-  }
-
-  // Change-dates: reveal the inline form
-  const changeBtn = e.target.closest('.btn-change-dates');
-  if (changeBtn) {
-    const { bookingId } = changeBtn.dataset;
-    const form = portalBookingsBody.querySelector(`.portal-change-form[data-booking-id="${bookingId}"]`);
-    if (form) form.hidden = false;
-    changeBtn.hidden = true;
-    return;
-  }
-
-  // Change-dates: dismiss the form without sending
-  const changeCancelBtn = e.target.closest('.btn-change-cancel');
-  if (changeCancelBtn) {
-    const form = changeCancelBtn.closest('.portal-change-form');
-    if (form) form.hidden = true;
-    const card = changeCancelBtn.closest('.portal-booking-card');
-    const reShowBtn = card && card.querySelector('.btn-change-dates');
-    if (reShowBtn) reShowBtn.hidden = false;
-    return;
-  }
-
-  // Change-dates: submit the request to Misti
-  const changeSubmitBtn = e.target.closest('.btn-change-submit');
-  if (changeSubmitBtn) {
-    const { bookingId } = changeSubmitBtn.dataset;
-    const form = changeSubmitBtn.closest('.portal-change-form');
-    const startDate = form.querySelector('.change-start-date')?.value || '';
-    const endEl = form.querySelector('.change-end-date');
-    const endDate = endEl ? endEl.value : undefined;
-    const status = form.querySelector('.change-status');
-    const setStatus = (msg) => { if (status) { status.textContent = msg; status.hidden = false; } };
-    if (!startDate) { setStatus('Please choose a new date.'); return; }
-    if (endDate !== undefined && endDate && endDate < startDate) { setStatus('End date must be on or after the start date.'); return; }
-    setStatus('Sending…');
-    changeSubmitBtn.disabled = true;
-    try {
-      const body = { startDate };
-      if (endDate !== undefined) body.endDate = endDate;
-      const res = await fetch(`${BOOKING_API}/api/client-portal/bookings/${bookingId}/change-request`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error('bad response');
-      form.innerHTML = "<p>✅ Your change request has been sent to Misti. She'll review it and confirm by email — your current reservation stays in place until then.</p>";
-    } catch (err) {
-      setStatus('Something went wrong sending your request. Please try again or contact us directly.');
-      changeSubmitBtn.disabled = false;
-    }
+    cancelActions.querySelector('.btn-cancel-reservation').hidden = false;
     return;
   }
 
@@ -2690,29 +3087,18 @@ async function loadSiteReviews() {
   if (!track) return;
   try {
     const res = await fetch(`${BOOKING_API}/api/reviews`);
-    if (res.ok) {
-      const reviews = await res.json();
-      if (Array.isArray(reviews) && reviews.length) {
-        // Match the static testimonial markup exactly so approved reviews get
-        // the same card face/styling as the others.
-        track.insertAdjacentHTML('beforeend', reviews.map(r => `
-      <div class="review-card">
-        <div class="review-card-inner">
-          <div class="review-card-front review-card-single">
-            <div class="stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div>
-            <p>"${escapeAttr(r.review_text)}"</p>
-            <span class="review-name">— ${escapeAttr(r.owner_name)}</span>
-          </div>
-        </div>
-      </div>`).join(''));
-      }
-    }
+    if (!res.ok) return;
+    const reviews = await res.json();
+    track.insertAdjacentHTML('beforeend', reviews.map(r => `
+      <div class="review-card reveal in-view">
+        <div class="stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div>
+        <p>"${r.review_text}"</p>
+        <span class="review-name">— ${r.owner_name}</span>
+      </div>
+    `).join(''));
   } catch {
     // reviews unavailable — leave the static testimonials as-is
   }
-  // Initialise the carousel AFTER approved reviews are in the DOM, so the
-  // stack includes them (it caches its cards at setup time).
-  setupStack(track, document.querySelector('.reviews-prev'), document.querySelector('.reviews-next'), { flip: false });
 }
 
 loadSiteReviews();
@@ -2791,40 +3177,5 @@ function setupStack(stack, prevBtn, nextBtn, { flip = true } = {}) {
   });
 }
 
-// reviewsTrack stack is initialised inside loadSiteReviews() (after approved
-// reviews load) so the carousel includes them.
-// ── Curated client photos ────────────────────────────────────────────────────
-// Pulls the photos Misti has featured in the admin (clients.featured_photos).
-// If any come back we swap the friendly placeholders for the real pet photos;
-// otherwise the placeholders stay. The card stack is initialised *after* the
-// swap so it tracks the cards actually in the DOM.
-async function loadSitePhotos() {
-  const track = document.getElementById('photosTrack');
-  if (!track) return;
-  let photos = [];
-  try {
-    const res = await fetch(`${BOOKING_API}/api/site-photos`);
-    if (res.ok) photos = await res.json();
-  } catch {
-    // gallery unavailable — keep the placeholders
-  }
-  if (Array.isArray(photos) && photos.length) {
-    track.innerHTML = photos.map(ph => {
-      const caption = ph.petName ? `${ph.petName} says hi! 🐾` : 'One of our happy clients! 🐾';
-      return `
-      <div class="review-card photo-card">
-        <div class="review-card-inner">
-          <div class="review-card-front" style="padding:0; overflow:hidden;">
-            <img src="${BOOKING_API}${ph.url}" alt="A happy client pet" loading="lazy" style="width:100%; height:100%; object-fit:cover; border-radius:var(--radius);" />
-          </div>
-          <div class="review-card-back photo-placeholder">
-            <span class="photo-icon">📸</span>
-            <p>${caption}</p>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
-  }
-  setupStack(track, document.querySelector('.photos-prev'), document.querySelector('.photos-next'));
-}
-loadSitePhotos();
+setupStack(document.getElementById('reviewsTrack'), document.querySelector('.reviews-prev'), document.querySelector('.reviews-next'), { flip: false });
+setupStack(document.getElementById('photosTrack'), document.querySelector('.photos-prev'), document.querySelector('.photos-next'));

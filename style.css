@@ -549,8 +549,7 @@ a { color: inherit; text-decoration: none; }
 .review-card-back {
   transform: rotateY(180deg);
   justify-content: center;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
 }
 
 .review-card .stars {
@@ -568,8 +567,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 .review-card-single {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
 }
 
 .review-card-single p {
@@ -577,6 +575,7 @@ a { color: inherit; text-decoration: none; }
   color: var(--brown-light);
   font-size: 0.95rem;
   line-height: 1.55;
+  overflow: hidden;
 }
 
 .review-card-front .review-name,
@@ -657,15 +656,6 @@ a { color: inherit; text-decoration: none; }
 
 @media (max-width: 800px) {
   .booking-top-row { flex-direction: column; }
-  /* Reviews wrap to more lines on narrow screens — give the cards more room
-     and slightly smaller text so the full review shows (and scrolls within
-     the card if it's still extra long, instead of being cut off). */
-  .review-stack { height: 640px; }
-  .review-card { height: 620px; }
-  .review-card-front,
-  .review-card-back { padding: 1.5rem 1.3rem; }
-  .review-card-single p,
-  .review-card-back p { font-size: 0.9rem; line-height: 1.5; }
 }
 
 /* ── AVAILABILITY CALENDAR ── */
@@ -813,6 +803,23 @@ a { color: inherit; text-decoration: none; }
   color: #b3261e;
 }
 
+/* Returning-client "please sign in" banner on the booking form. */
+.returning-banner {
+  margin-top: 0.6rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--rust-light);
+  border-left: 4px solid var(--rust);
+  border-radius: 12px;
+  background: #fbeee6;
+}
+.returning-banner p {
+  font-size: 0.9rem;
+  color: var(--brown);
+  margin-bottom: 0.7rem;
+  line-height: 1.4;
+}
+.returning-banner .btn { width: 100%; }
+
 /* ── DROP-IN / WALK TIME SLOTS ── */
 .dropin-slots {
   display: grid;
@@ -844,37 +851,155 @@ a { color: inherit; text-decoration: none; }
   cursor: not-allowed;
 }
 
-/* A multi-day drop-in's "use the same times as the first day" row. */
-.inherit-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin: 0.1rem 0 0.4rem;
-}
-
-/* Shown instead of the toggle when the first day's times aren't open that day:
-   no same-times option, just a red ✕ telling the client to pick open times. */
-.inherit-conflict {
-  background: #f6d6d2;
-  border: 1px solid #c0392b;
-  border-radius: 10px;
-  padding: 0.45rem 0.7rem;
-  color: #8a2a20;
-  font-size: 0.92rem;
-}
-
-.inherit-conflict .inherit-x {
-  flex: 0 0 auto;
-  font-weight: 800;
-  color: #c0392b;
-  font-size: 1.1rem;
-}
-
 .slots-loading, .slots-error {
   font-size: 0.85rem;
   color: var(--brown-light);
   grid-column: 1 / -1;
+}
+
+/* Multi-day drop-in plan (add several days, each with its own times). */
+.add-day-btn {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  padding: 0.45rem 1rem;
+}
+
+/* Per-day time grids: one block per selected drop-in day. */
+.dropin-day {
+  margin-top: 0.9rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--border, #d8cbb6);
+}
+.dropin-day:first-child { border-top: none; padding-top: 0; }
+.dropin-day__date {
+  font-weight: 700;
+  color: var(--brown);
+  margin-bottom: 0.1rem;
+}
+.dropin-day__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.dropin-day__slots { margin-top: 0.4rem; }
+.dropin-day__sub { color: var(--brown-light); font-size: 0.85rem; margin: 0.1rem 0 0.5rem; }
+
+/* "Use same drop-in times as <day>" row with an on/off switch. */
+.inherit-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.3rem 0 0.6rem;
+  font-size: 0.92rem;
+  color: var(--brown);
+  cursor: pointer;
+}
+.inherit-switch {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 26px;
+  border-radius: 999px;
+  background: #cfc6b6;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.inherit-switch:checked { background: var(--rust); }
+.inherit-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.2s;
+}
+.inherit-switch:checked::after { left: 23px; }
+
+/* Selected-day chips (removable) shown above the time picker. */
+.dropin-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
+.dropin-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--dog);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.25rem 0.4rem 0.25rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.dropin-chip__x {
+  border: none;
+  background: rgba(255, 255, 255, 0.3);
+  color: #fff;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 50%;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.dropin-chip__x:hover { background: rgba(255, 255, 255, 0.55); }
+
+/* "Same times for every day?" toggle. */
+.same-times-toggle {
+  margin: 0.3rem 0 0.6rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--cream-soft);
+  border-radius: 12px;
+}
+.same-times-toggle__q { margin: 0 0 0.45rem; font-weight: 700; color: var(--brown); font-size: 0.9rem; }
+.same-times-toggle__opts { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.same-times-toggle__opts .slot-btn { flex: 1 1 auto; min-width: 140px; }
+
+.dropin-plan { margin-top: 0.75rem; }
+
+.dropin-plan__title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--brown-light);
+  margin: 0 0 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.dropin-plan__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.4rem;
+  background: var(--cream-soft);
+  border-radius: 10px;
+}
+
+.dropin-plan__day { font-size: 0.85rem; font-weight: 600; color: var(--brown); }
+
+.dropin-plan__remove {
+  border: none;
+  background: none;
+  color: var(--rust);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+}
+
+.dropin-plan__remove:hover { text-decoration: underline; }
+
+/* A day already added to the multi-day plan, shown on the calendar. */
+.cal-planned {
+  background: var(--dog);
+  color: #fff;
+  box-shadow: inset 0 0 0 2px var(--rust);
 }
 
 .booking-status {
@@ -1441,13 +1566,13 @@ input:focus, select:focus, textarea:focus {
 }
 
 .portal-booking-row span:first-child {
-  min-width: 0;
-  overflow-wrap: break-word;
+  flex-shrink: 0;
 }
 
 .portal-booking-row span:last-child {
-  flex-shrink: 0;
+  min-width: 0;
   text-align: right;
+  word-break: break-word;
 }
 
 .portal-edit-bar {
@@ -1508,8 +1633,6 @@ input:focus, select:focus, textarea:focus {
 .portal-cancel-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.6rem;
-  flex-wrap: wrap;
   margin-top: 0.5rem;
 }
 
@@ -1536,42 +1659,6 @@ input:focus, select:focus, textarea:focus {
 }
 
 .portal-cancel-confirm-actions .btn {
-  padding: 0.45rem 1rem;
-  font-size: 0.85rem;
-}
-
-.portal-change-form {
-  margin-top: 0.6rem;
-  padding-top: 0.6rem;
-  border-top: 1px solid #eee;
-}
-
-.portal-change-title { margin: 0 0 0.5rem; font-size: 0.9rem; font-weight: 600; }
-
-.portal-change-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  font-size: 0.85rem;
-  margin-bottom: 0.5rem;
-  max-width: 240px;
-}
-
-.portal-change-field input {
-  padding: 0.4rem 0.5rem;
-  border: 1px solid #d9c9b6;
-  border-radius: 6px;
-  font-size: 0.9rem;
-}
-
-.portal-change-actions {
-  display: flex;
-  gap: 0.6rem;
-  justify-content: flex-end;
-  margin-top: 0.4rem;
-}
-
-.portal-change-actions .btn {
   padding: 0.45rem 1rem;
   font-size: 0.85rem;
 }

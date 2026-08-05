@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="style.css?v=20260629e" />
+<link rel="stylesheet" href="style.css?v=20260805daycare" />
 </head>
 <body>
 
@@ -61,49 +61,39 @@
               <option value="Day Care">Day Care</option>
             </select>
           </div>
-          <div class="booking-top-row">
-            <div class="calendar-card">
-              <div class="calendar-header">
-                <button type="button" id="rebookCalPrev" class="cal-nav" aria-label="Previous month">‹</button>
-                <h3 id="rebookCalMonthLabel"></h3>
-                <button type="button" id="rebookCalNext" class="cal-nav" aria-label="Next month">›</button>
-              </div>
-              <div id="rebookAvailabilityCalendar" class="calendar-grid"></div>
-              <div class="calendar-legend">
-                <span><i class="dot dot-available"></i> Available</span>
-                <span><i class="dot dot-unavailable"></i> Unavailable</span>
-              </div>
-              <p class="calendar-note">Click an available date to pick it — click a second, later date to book a range. Drop-in visits don't take a full day, so you'll pick a time right here after choosing a date.</p>
-
-              <input type="hidden" id="rebookStartDate" name="startDate" required />
-              <input type="hidden" id="rebookEndDate" name="endDate" />
-
-              <div id="rebookCalendarTimePanel" class="calendar-time-panel" hidden>
-                <p id="rebookCalendarTimePanelSummary" class="calendar-time-panel__summary"></p>
-                <div id="rebookScheduleFields">
-                  <div class="form-row">
-                    <div class="form-group" id="rebookStartTimeGroup">
-                      <label for="rebookStartTime" id="rebookStartTimeLabel">Preferred Time</label>
-                      <select id="rebookStartTime" name="startTime"></select>
-                    </div>
-                    <div class="form-group" id="rebookEndTimeGroup" hidden>
-                      <label for="rebookEndTime">Pick-up Time</label>
-                      <select id="rebookEndTime" name="endTime"></select>
-                    </div>
-                  </div>
-
-                  <div class="form-group full" id="rebookPresetTimesGroup" hidden>
-                    <label>Usual Times <span class="field-hint">(tap to add)</span></label>
-                    <div id="rebookPresetTimes" class="dropin-slots"></div>
-                  </div>
-
-                  <div class="form-group full" id="rebookDropinSlotsGroup" hidden>
-                    <label>Available Times <span class="field-hint">(select one or more)</span></label>
-                    <div id="rebookDropinSlots" class="dropin-slots"></div>
-                  </div>
-                </div>
-              </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="rebookStartDate">Start Date</label>
+              <input type="date" id="rebookStartDate" name="startDate" required />
             </div>
+            <div class="form-group" data-rebook-for="Overnight Stay,Day Care,Drop-In Visit" hidden>
+              <label for="rebookEndDate">End Date <span class="field-hint">(optional &mdash; for multiple days)</span></label>
+              <input type="date" id="rebookEndDate" name="endDate" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" data-rebook-for="Overnight Stay,Day Care" hidden>
+              <label for="rebookStartTime">Drop-off Time</label>
+              <select id="rebookStartTime" name="startTime"></select>
+            </div>
+            <div class="form-group" data-rebook-for="Overnight Stay,Day Care" hidden>
+              <label for="rebookEndTime">Pick-up Time</label>
+              <select id="rebookEndTime" name="endTime"></select>
+            </div>
+          </div>
+          <div class="form-group full" id="rebookPresetTimesGroup" hidden>
+            <label>Usual Times <span class="field-hint">(tap to add)</span></label>
+            <div id="rebookPresetTimes" class="dropin-slots"></div>
+          </div>
+          <div class="form-group full" id="rebookDropinSlotsGroup" data-rebook-for="Drop-In Visit" hidden>
+            <label>Days &amp; Times <span class="field-hint">(pick a date above to add a day, then choose its time(s) &mdash; add more dates for more days, each with their own times)</span></label>
+            <div id="rebookDropinSlots" class="dropin-slots"></div>
+            <button type="button" id="addRebookDay" class="btn btn-outline add-day-btn">+ Add this day to my request</button>
+            <div id="rebookPlanList" class="dropin-plan"></div>
+          </div>
+          <div class="form-group full" id="rebookDayCareGroup" data-rebook-for="Day Care" hidden>
+            <label>Day Care Days <span class="field-hint">(pick a date above to add it &mdash; they don't have to be back-to-back; add more dates for more days)</span></label>
+            <div id="rebookDayCareList" class="dropin-plan"></div>
           </div>
           <div class="form-group full">
             <label for="rebookNotes">Anything we should know for this visit?</label>
@@ -335,6 +325,8 @@
           <h3>🏠 Drop-In Visits <span class="rate-card-sub">at your home, near 64119</span></h3>
           <div class="rate-row"><span>30 min &middot; under 5 mi</span><span>$16</span></div>
           <div class="rate-row"><span>30 min &middot; 5+ mi</span><span>$18</span></div>
+          <div class="rate-row"><span>60 min &middot; under 5 mi</span><span>$26</span></div>
+          <div class="rate-row"><span>60 min &middot; 5+ mi</span><span>$28</span></div>
           <div class="rate-row"><span>Puppy add-on</span><span>+$4</span></div>
           <div class="rate-row"><span>Extended (14+ visits) 30 min &middot; under 5 mi</span><span>$15</span></div>
           <div class="rate-row"><span>Extended (14+ visits) 30 min &middot; 5+ mi</span><span>$17</span></div>
@@ -367,7 +359,7 @@
     <div class="section-inner">
       <div class="reviews-badge reveal">
         <span class="stars">★★★★★</span>
-        <p>100% Recommend</p>
+        <p>100% Recommend &middot; 5 Reviews on Facebook</p>
       </div>
 
       <div class="reviews-col">
@@ -519,7 +511,8 @@
               <span><i class="dot dot-available"></i> Available</span>
               <span><i class="dot dot-unavailable"></i> Unavailable</span>
             </div>
-            <p class="calendar-note">Click an available date to pick it — click a second, later date to book a range. Drop-in visits and walks don't take a full day, so you'll pick a time right here after choosing a date.</p>
+            <button type="button" id="clearDatesBtn" class="btn btn-outline" style="margin-top:0.5rem;font-size:0.85rem;padding:0.4rem 1rem;" hidden>Clear dates</button>
+            <p class="calendar-note"><strong>Drop-in visits:</strong> tap each day you want — a time picker appears below for every day, so you can choose different times per day. Tapped the wrong day? Tap it again (or use “Remove day” below) to deselect it. <strong>Overnight / Day Care:</strong> click a start date, then a later date for a range; tap a selected date again to clear it.</p>
 
             <input type="hidden" id="startDate" name="startDate" required />
             <input type="hidden" id="endDate" name="endDate" />
@@ -539,8 +532,10 @@
                 </div>
 
                 <div class="form-group full" id="dropinSlotsGroup" hidden>
-                  <label>Available Times <span class="field-hint">(select one or more &mdash; applied to every day if you set an end date above)</span></label>
+                  <label>Available Times <span class="field-hint">(pick this day's time(s), then add the day &mdash; repeat to book several days with different times)</span></label>
                   <div id="dropinSlots" class="dropin-slots"></div>
+                  <button type="button" id="addDropInDay" class="btn btn-outline add-day-btn">+ Add this day to my request</button>
+                  <div id="dropInPlanList" class="dropin-plan"></div>
                 </div>
               </div>
             </div>
@@ -707,20 +702,6 @@
         </div>
 
         <div class="form-group full">
-          <label>Schedule Type</label>
-          <div class="radio-row">
-            <label class="radio-option">
-              <input type="radio" name="clientType" value="One-Time" checked />
-              One-Time / Specific Dates
-            </label>
-            <label class="radio-option">
-              <input type="radio" name="clientType" value="Ongoing" />
-              Ongoing / Recurring &mdash; schedule based on availability
-            </label>
-          </div>
-        </div>
-
-        <div class="form-group full">
           <label class="checkbox-option">
             <input type="checkbox" id="photoConsent" name="photoConsent" />
             I consent to Wags and Whiskers by Misti, LLC posting photos of my pet(s) and any reviews I provide on the website and social media.
@@ -763,6 +744,6 @@
     </div>
   </footer>
 
-  <script src="script.js?v=20260629e"></script>
+  <script src="script.js?v=20260805daycare"></script>
 </body>
 </html>
