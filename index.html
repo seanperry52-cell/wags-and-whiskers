@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="style.css?v=20260805daycare" />
+<link rel="stylesheet" href="style.css?v=20260805rebookcal" />
 </head>
 <body>
 
@@ -61,15 +61,20 @@
               <option value="Day Care">Day Care</option>
             </select>
           </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="rebookStartDate">Start Date</label>
-              <input type="date" id="rebookStartDate" name="startDate" required />
+          <div class="calendar-card">
+            <div class="calendar-header">
+              <button type="button" id="rebookCalPrev" class="cal-nav" aria-label="Previous month">‹</button>
+              <h3 id="rebookCalMonthLabel"></h3>
+              <button type="button" id="rebookCalNext" class="cal-nav" aria-label="Next month">›</button>
             </div>
-            <div class="form-group" data-rebook-for="Overnight Stay,Day Care,Drop-In Visit" hidden>
-              <label for="rebookEndDate">End Date <span class="field-hint">(optional &mdash; for multiple days)</span></label>
-              <input type="date" id="rebookEndDate" name="endDate" />
+            <div id="rebookAvailabilityCalendar" class="calendar-grid"></div>
+            <div class="calendar-legend">
+              <span><i class="dot dot-available"></i> Available</span>
+              <span><i class="dot dot-unavailable"></i> Unavailable</span>
             </div>
+            <p class="calendar-note"><strong>Drop-in / Day Care:</strong> tap each day you want (tap it again to remove). <strong>Overnight:</strong> tap a start date, then a later date for a range; tap a selected date again to clear it.</p>
+            <input type="hidden" id="rebookStartDate" name="startDate" />
+            <input type="hidden" id="rebookEndDate" name="endDate" />
           </div>
           <div class="form-row">
             <div class="form-group" data-rebook-for="Overnight Stay,Day Care" hidden>
@@ -744,6 +749,6 @@
     </div>
   </footer>
 
-  <script src="script.js?v=20260805daycare"></script>
+  <script src="script.js?v=20260805rebookcal"></script>
 </body>
 </html>

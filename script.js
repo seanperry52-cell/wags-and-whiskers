@@ -1982,6 +1982,14 @@ populateTimeOptions(rebookEndTimeInput);
 const rebookPresetTimesGroup = document.getElementById('rebookPresetTimesGroup');
 const rebookPresetTimes = document.getElementById('rebookPresetTimes');
 
+// The returning-client "Book a Visit" tab uses the same visual availability
+// calendar as new clients (not a native date input). rebookCalMonth is the
+// month on screen; rebookSelStart/End hold an overnight range's endpoints.
+let rebookCalMonth = new Date();
+rebookCalMonth.setDate(1);
+let rebookSelStart = null;
+let rebookSelEnd = null;
+
 // Holds the signed-in client's portal data (profile, sections, bookings).
 // Declared here (rather than down by the rest of the portal-rendering code)
 // because updateRebookFieldVisibility() below runs once unconditionally at
@@ -2222,6 +2230,132 @@ async function loadSharedRebookSlots(grid) {
   }
 }
 
+// Renders the returning-client month calendar — same look/behaviour as the
+// new-client one (renderCalendar), just bound to the rebook state and element.
+async function renderRebookCalendar() {
+  const calEl = document.getElementById('rebookAvailabilityCalendar');
+  if (!calEl) return;
+  const monthLabel = document.getElementById('rebookCalMonthLabel');
+  const year = rebookCalMonth.getFullYear();
+  const month = rebookCalMonth.getMonth();
+  monthLabel.textContent = rebookCalMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const from = ymd(year, month, 1);
+  const to = ymd(year, month, daysInMonth);
+
+  let availability = { blocked: [], booked: [] };
+  try {
+    const res = await fetch(`${BOOKING_API}/api/availability?from=${from}&to=${to}`);
+    if (res.ok) availability = await res.json();
+  } catch (err) { /* show calendar without shading if the server is unreachable */ }
+
+  const blockedSet = new Set(availability.blocked || []);
+  const bookedSet = new Set(availability.booked || []);
+  const todayStr = ymd(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+  const type = rebookServiceType.value;
+  const isDropIn = DROP_IN_SERVICES.has(type);
+
+  calEl.innerHTML = '';
+  ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(d => {
+    const cell = document.createElement('div');
+    cell.className = 'cal-weekday';
+    cell.textContent = d;
+    calEl.appendChild(cell);
+  });
+  for (let i = 0; i < firstWeekday; i++) calEl.appendChild(document.createElement('div'));
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = ymd(year, month, day);
+    const cell = document.createElement('div');
+    cell.className = 'cal-day';
+    cell.dataset.date = dateStr;
+    if (dateStr === todayStr) cell.classList.add('cal-today');
+    const unavailable = blockedSet.has(dateStr) || (bookedSet.has(dateStr) && !isDropIn);
+    cell.classList.add(unavailable ? 'cal-unavailable' : 'cal-available');
+    // Overnight shows a highlighted range; drop-in/day-care highlight each
+    // separately-picked day.
+    const inRange = !unavailable && rebookSelStart && (
+      rebookSelEnd ? (dateStr >= rebookSelStart && dateStr <= rebookSelEnd) : dateStr === rebookSelStart
+    );
+    if (inRange) cell.classList.add('cal-selected');
+    if (!unavailable && type !== 'Overnight Stay' && rebookPlan.some((p) => p.date === dateStr)) {
+      cell.classList.add('cal-planned');
+    }
+    cell.textContent = day;
+    if (!unavailable) cell.addEventListener('click', () => handleRebookDayClick(dateStr));
+    calEl.appendChild(cell);
+  }
+}
+
+// A day tapped on the rebook calendar. Drop-in/Day-Care toggle the day in
+// rebookPlan (each its own booking); Overnight builds a contiguous range.
+function handleRebookDayClick(dateStr) {
+  const type = rebookServiceType.value;
+  if (type === 'Drop-In Visit') {
+    const i = rebookPlan.findIndex((p) => p.date === dateStr);
+    if (i >= 0) rebookPlan.splice(i, 1);
+    else {
+      upsertPlanDay(rebookPlan, dateStr, [...getRebookPresetTimes()]);
+      const added = rebookPlan.find((p) => p.date === dateStr);
+      if (added && added.inherit === undefined) added.inherit = true;
+    }
+    rebookPlan.sort((a, b) => a.date.localeCompare(b.date));
+    rebookStartDateInput.value = rebookPlan[0] ? rebookPlan[0].date : '';
+    renderRebookTimes();
+    renderRebookCalendar();
+    showRebookStatus('', '');
+    return;
+  }
+  if (type === 'Day Care') {
+    const i = rebookPlan.findIndex((p) => p.date === dateStr);
+    if (i >= 0) rebookPlan.splice(i, 1);
+    else { rebookPlan.push({ date: dateStr }); rebookPlan.sort((a, b) => a.date.localeCompare(b.date)); }
+    rebookStartDateInput.value = rebookPlan[0] ? rebookPlan[0].date : '';
+    renderRebookDayCareList();
+    renderRebookCalendar();
+    showRebookStatus('', '');
+    return;
+  }
+  // Overnight Stay: a contiguous range (mirrors the new-client selectCalendarDate).
+  let start = rebookSelStart;
+  let end = rebookSelEnd || rebookSelStart;
+  if (!start) { start = end = dateStr; }
+  else if (dateStr < start) { start = dateStr; }
+  else if (dateStr > end) { end = dateStr; }
+  else if (dateStr === start && dateStr === end) { start = end = null; }
+  else if (dateStr === start) { start = addDaysStr(start, 1); }
+  else if (dateStr === end) { end = addDaysStr(end, -1); }
+  else { end = addDaysStr(dateStr, -1); }
+  setRebookOvernightRange(start, end);
+  renderRebookCalendar();
+  showRebookStatus('', '');
+}
+
+function setRebookOvernightRange(start, end) {
+  if (!start) {
+    rebookStartDateInput.value = '';
+    rebookEndDateInput.value = '';
+    rebookSelStart = null;
+    rebookSelEnd = null;
+  } else {
+    const single = !end || end === start;
+    rebookStartDateInput.value = start;
+    rebookEndDateInput.value = single ? '' : end;
+    rebookSelStart = start;
+    rebookSelEnd = single ? null : end;
+  }
+}
+
+document.getElementById('rebookCalPrev')?.addEventListener('click', () => {
+  rebookCalMonth.setMonth(rebookCalMonth.getMonth() - 1);
+  renderRebookCalendar();
+});
+document.getElementById('rebookCalNext')?.addEventListener('click', () => {
+  rebookCalMonth.setMonth(rebookCalMonth.getMonth() + 1);
+  renderRebookCalendar();
+});
+
 function updateRebookFieldVisibility() {
   const type = rebookServiceType.value;
   document.querySelectorAll('[data-rebook-for]').forEach(el => {
@@ -2230,24 +2364,22 @@ function updateRebookFieldVisibility() {
   rebookPlan = [];
   rebookSameTimes = true;
   rebookSharedTimes = [];
+  rebookSelStart = null;
+  rebookSelEnd = null;
+  rebookStartDateInput.value = '';
+  rebookEndDateInput.value = '';
   if (type === 'Drop-In Visit') {
     renderRebookTimes();
-    // The date field is an "add a day" picker now, so hide the single preset
-    // row and the end-date range.
     rebookPresetTimesGroup.hidden = true;
     rebookPresetTimes.innerHTML = '';
-    rebookEndDateInput.closest('.form-group').hidden = true;
   } else if (type === 'Day Care') {
-    // Day Care is also an "add a day" picker (multiple separate days, one
-    // drop-off/pick-up time for all) — no end-date range.
-    rebookEndDateInput.value = '';
-    rebookEndDateInput.closest('.form-group').hidden = true;
     renderRebookDayCareList();
   } else {
     selectedRebookSlots.clear();
     rebookDropinSlots.innerHTML = '';
     renderRebookPresetTimes();
   }
+  renderRebookCalendar();
 }
 rebookServiceType.addEventListener('change', updateRebookFieldVisibility);
 rebookStartDateInput.addEventListener('change', () => {
@@ -2360,6 +2492,11 @@ rebookForm.addEventListener('submit', async (e) => {
     body.startDate = requestDates[0];
     body.endDate = '';
     if (requestDates.length > 1) groupId = genGroupId();
+  } else if (!body.startDate) {
+    // Overnight Stay: the calendar sets the hidden startDate (and endDate for a
+    // range). No date picked yet -> nothing to submit.
+    showRebookStatus('Please tap a date on the calendar.', 'error');
+    return;
   }
 
   showRebookStatus('Sending your request...', '');
@@ -3022,6 +3159,9 @@ function switchClientTab(name) {
   for (const [key, el] of Object.entries(clientTabContents)) {
     el.hidden = key !== name;
   }
+  // The rebook calendar renders empty if it was built while its tab was hidden
+  // (some browsers skip layout for display:none) — (re)render when it's shown.
+  if (name === 'book') renderRebookCalendar();
 }
 
 clientTabs.forEach(tab => tab.addEventListener('click', () => switchClientTab(tab.dataset.tab)));
