@@ -74,7 +74,7 @@ const BOOKING_API = 'https://desktop-rac3kc3.tail27701f.ts.net/wags-booking';
 // be running an old script. Compare our version against the published one and
 // reload if it's stale (once per version, to avoid loops). This is why earlier
 // booking-calendar fixes "didn't work" — the tab was still on old code.
-const SITE_VERSION = '20260627perday11';
+const SITE_VERSION = '20261105photos';
 (function watchSiteVersion() {
   async function check() {
     try {
@@ -3318,4 +3318,41 @@ function setupStack(stack, prevBtn, nextBtn, { flip = true } = {}) {
 }
 
 setupStack(document.getElementById('reviewsTrack'), document.querySelector('.reviews-prev'), document.querySelector('.reviews-next'), { flip: false });
-setupStack(document.getElementById('photosTrack'), document.querySelector('.photos-prev'), document.querySelector('.photos-next'));
+// ── Happy Clients photos ─────────────────────────────────────────────────────
+// Swap the static placeholder cards for the photos Misti has featured in the
+// admin (/api/site-photos). If the feed is empty or unreachable, the
+// placeholders stay. The stack is set up only after the swap, since
+// setupStack captures its cards once.
+async function loadSitePhotos() {
+  const track = document.getElementById('photosTrack');
+  if (!track) return;
+  try {
+    const res = await fetch(`${BOOKING_API}/api/site-photos`);
+    if (!res.ok) return;
+    const photos = await res.json();
+    if (!Array.isArray(photos) || !photos.length) return;
+    const esc = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    track.innerHTML = photos.map((p, i) => {
+      const name = esc(p.petName);
+      return `
+      <div class="review-card photo-card">
+        <div class="review-card-inner">
+          <div class="review-card-front photo-real">
+            <img src="${esc(BOOKING_API + p.url)}" alt="${name ? `${name}, a happy Wags and Whiskers client` : 'A happy Wags and Whiskers client'}" ${i > 1 ? 'loading="lazy"' : ''} decoding="async" />
+            <span class="review-flip-hint">Tap for details</span>
+          </div>
+          <div class="review-card-back photo-placeholder">
+            <span class="photo-icon">🐾</span>
+            <p>${name ? `Meet ${name}! One of our happy, spoiled clients.` : 'One of our happy, spoiled clients!'}</p>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch {
+    // photos unavailable — leave the placeholder cards as-is
+  }
+}
+
+loadSitePhotos().finally(() => {
+  setupStack(document.getElementById('photosTrack'), document.querySelector('.photos-prev'), document.querySelector('.photos-next'));
+});
